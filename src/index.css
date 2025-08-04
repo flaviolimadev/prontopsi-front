@@ -1,0 +1,322 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+/* Font Definitions */
+@font-face {
+  font-family: 'Loretto';
+  src: url('@/assets/fonts/Loretto/fonnts.com-Loretto_Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Loretto';
+  src: url('@/assets/fonts/Loretto/fonnts.com-Loretto_Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Loretto';
+  src: url('@/assets/fonts/Loretto/fonnts.com-Loretto_Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Loretto';
+  src: url('@/assets/fonts/Loretto/fonnts.com-Loretto_Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('@/assets/fonts/Hanken_Grotesk/HankenGrotesk-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('@/assets/fonts/Hanken_Grotesk/HankenGrotesk-Italic-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    /* ProntuPsi Light Tech Theme - Modern & Clean */
+    --background: 0 0% 99%;          /* Fundo muito claro */
+    --foreground: 220 13% 18%;       /* Texto escuro suave */
+    --card: 0 0% 100%;               /* Cards brancos */
+    --card-foreground: 220 13% 18%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 18%;
+    --primary: 265 99% 51%;          /* Roxo vibrante #8609fd */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 265 99% 56%;
+    --primary-light: 265 99% 97%;
+    --secondary: 220 14% 96%;        /* Cinza muito claro */
+    --secondary-foreground: 220 13% 18%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 199 89% 48%;           /* Azul tech mais escuro */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;        /* Vermelho */
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;           /* Bordas suaves */
+    --input: 0 0% 100%;
+    --ring: 265 99% 51%;
+    --success: 142 71% 45%;          /* Verde mais escuro */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --radius: 0.75rem;
+    
+    /* Tech gradient effects for light theme */
+    --gradient-primary: linear-gradient(135deg, hsl(265 99% 51%) 0%, hsl(199 89% 48%) 100%);
+    --gradient-light: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(220 14% 98%) 100%);
+    --glow-primary: 0 0 20px hsl(265 99% 51% / 0.15);
+    --glow-accent: 0 0 20px hsl(199 89% 48% / 0.15);
+    
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 13% 18%;
+    --sidebar-primary: 265 99% 51%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 98%;
+    --sidebar-accent-foreground: 220 13% 18%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 265 99% 51%;
+  }
+
+  .dark {
+    /* Dark mode elegante e moderno */
+    --background: 220 23% 6%;        /* Fundo escuro elegante */
+    --foreground: 220 20% 98%;       /* Texto branco puro */
+    --card: 220 23% 9%;              /* Cards escuros elegantes */
+    --card-foreground: 220 20% 98%;
+    --popover: 220 23% 9%;
+    --popover-foreground: 220 20% 98%;
+    --primary: 265 89% 78%;          /* Roxo mais suave e elegante */
+    --primary-foreground: 220 23% 6%;
+    --primary-hover: 265 89% 83%;
+    --primary-light: 220 23% 12%;
+    --secondary: 220 23% 12%;        /* Cinza escuro elegante */
+    --secondary-foreground: 220 20% 98%;
+    --muted: 220 23% 12%;
+    --muted-foreground: 220 13% 75%; /* Cinza mais claro para melhor contraste */
+    --accent: 199 89% 68%;           /* Azul mais suave */
+    --accent-foreground: 220 23% 6%;
+    --destructive: 0 84% 70%;        /* Vermelho mais suave */
+    --destructive-foreground: 220 23% 6%;
+    --border: 220 23% 15%;           /* Bordas mais suaves */
+    --input: 220 23% 12%;
+    --ring: 265 89% 78%;
+    --success: 142 71% 65%;          /* Verde mais suave */
+    --success-foreground: 220 23% 6%;
+    --warning: 38 92% 70%;           /* Amarelo mais suave */
+    --warning-foreground: 220 23% 6%;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(265 89% 78%) 0%, hsl(199 89% 68%) 100%);
+    --glow-primary: 0 0 20px hsl(265 89% 78% / 0.25);
+    --glow-accent: 0 0 20px hsl(199 89% 68% / 0.25);
+    
+    --sidebar-background: 220 23% 8%;
+    --sidebar-foreground: 220 20% 98%;
+    --sidebar-primary: 265 89% 78%;
+    --sidebar-primary-foreground: 220 23% 6%;
+    --sidebar-accent: 220 23% 12%;
+    --sidebar-accent-foreground: 220 20% 98%;
+    --sidebar-border: 220 23% 15%;
+    --sidebar-ring: 265 89% 78%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply bg-background text-foreground;
+  }
+
+  body {
+    @apply bg-background text-foreground font-hanken;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-variation-settings: normal;
+    letter-spacing: -0.01em;
+  }
+
+  /* Forçar fundo escuro no dark mode */
+  .dark {
+    background-color: hsl(220 23% 6%);
+    color: hsl(220 20% 98%);
+  }
+
+  .dark html {
+    background-color: hsl(220 23% 6%);
+  }
+
+  .dark body {
+    background-color: hsl(220 23% 6%);
+  }
+
+  /* Calendar customization - force primary color */
+  [data-selected] {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+  }
+
+  .rdp-day_selected {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+  }
+
+  /* ProntuPsi Light Tech Styling */
+  .card-enhanced {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  }
+
+  .card-enhanced::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--gradient-primary);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+  }
+
+  .card-enhanced:hover {
+    transform: translateY(-3px);
+    border-color: hsl(var(--primary) / 0.5);
+    box-shadow: 0 8px 25px -5px hsl(var(--primary) / 0.1), 0 4px 10px -2px hsl(var(--primary) / 0.05);
+  }
+
+  .card-enhanced:hover::before {
+    opacity: 0.03;
+  }
+
+  /* Tech Button Styling - Light Version */
+  .btn-tech {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-tech::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: hsl(var(--primary));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+  }
+
+  .btn-tech:hover {
+    transform: translateY(-2px);
+    border-color: hsl(var(--primary));
+    box-shadow: 0 4px 15px -3px hsl(var(--primary) / 0.2);
+    color: hsl(var(--primary-foreground));
+  }
+
+  .btn-tech:hover::before {
+    opacity: 1;
+  }
+
+  .btn-tech:hover .text-muted-foreground {
+    color: hsl(var(--primary-foreground) / 0.8) !important;
+  }
+
+  .btn-tech:hover .text-primary {
+    color: hsl(var(--primary-foreground)) !important;
+  }
+
+  /* Smooth tech transitions */
+  .transition-tech {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Subtle glow effects for light theme */
+  .glow-primary {
+    filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.3));
+  }
+
+  .glow-accent {
+    filter: drop-shadow(0 0 8px hsl(var(--accent) / 0.3));
+  }
+
+  /* Sidebar enhancements */
+  .sidebar-item:hover {
+    background: var(--gradient-primary);
+    color: hsl(var(--primary-foreground));
+  }
+
+  /* Dark mode specific improvements */
+  .dark .card-enhanced {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+  }
+
+  .dark .card-enhanced:hover {
+    box-shadow: 0 8px 25px -5px hsl(var(--primary) / 0.2), 0 4px 10px -2px hsl(var(--primary) / 0.1);
+  }
+
+  /* Melhorar contraste do texto no dark mode */
+  .dark .text-muted-foreground {
+    color: hsl(220 13% 75%) !important;
+  }
+
+  .dark .text-gray-500 {
+    color: hsl(220 13% 75%) !important;
+  }
+
+  .dark .text-gray-400 {
+    color: hsl(220 13% 80%) !important;
+  }
+
+  /* Banners mais suaves no dark mode */
+  .dark .bg-red-500,
+  .dark .bg-red-600 {
+    background-color: hsl(0 70% 60%) !important;
+  }
+
+  .dark .bg-red-100 {
+    background-color: hsl(0 70% 15%) !important;
+  }
+
+  .dark .text-red-600 {
+    color: hsl(0 70% 70%) !important;
+  }
+
+  .dark .border-red-200 {
+    border-color: hsl(0 70% 20%) !important;
+  }
+}
