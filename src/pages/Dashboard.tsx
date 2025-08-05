@@ -20,14 +20,25 @@ export default function Dashboard() {
   const isMobile = useIsMobile();
   const { syncAllData, syncStatus, lastSync } = useDataSync();
   
-  // Extrair apenas o primeiro nome do display_name ou email
-  const firstName = (() => {
-    const fullName = user?.user_metadata?.full_name;
-    if (fullName) {
-      return fullName.split(' ')[0]; // Apenas primeiro nome
+  // Função para obter saudação e ícone baseado no horário
+  const getGreetingWithIcon = () => {
+    const now = new Date();
+    const hour = now.getHours();
+    
+    if (hour >= 0 && hour < 6) {
+      return { greeting: "Ótima madrugada", icon: "🌙" };
+    } else if (hour >= 6 && hour < 12) {
+      return { greeting: "Bom dia", icon: "🌅" };
+    } else if (hour >= 12 && hour < 18) {
+      return { greeting: "Boa tarde", icon: "☀️" };
+    } else {
+      return { greeting: "Boa noite", icon: "🌆" };
     }
-    return user?.email?.split('@')[0] || '';
-  })();
+  };
+
+  // Obter nome do usuário e dados de saudação
+  const userName = user?.nome || user?.email?.split('@')[0] || 'Usuário';
+  const { greeting, icon } = getGreetingWithIcon();
 
   // Sincronizar dados quando o dashboard é carregado
   useEffect(() => {
@@ -46,7 +57,7 @@ export default function Dashboard() {
             "font-bold text-foreground break-words",
             isMobile ? "text-xl" : "text-2xl md:text-3xl"
           )}>
-            Olá{firstName ? `, ${firstName}` : ''}! Bem-vindo ao seu dia 💜
+            {greeting}, {userName}! Bem-vindo {icon}💜
           </h1>
           <SyncIndicator 
             status={syncStatus} 

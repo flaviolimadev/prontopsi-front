@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import apiService from '@/services/api.service';
 
 export interface MedicalRecord {
   id: string;
@@ -81,20 +82,30 @@ const mockMedicalRecords: MedicalRecord[] = [
 ];
 
 export function useMedicalRecords() {
-  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>(mockMedicalRecords);
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Carregar dados automaticamente quando o hook é montado
+  useEffect(() => {
+    fetchRecords();
+  }, []);
 
   const fetchRecords = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Simular delay de rede
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      // TODO: Implementar endpoint /medical-records no backend
+      // Por enquanto, usar dados mock como fallback
       setMedicalRecords(mockMedicalRecords);
+      
+      /* Implementação futura quando backend estiver pronto:
+      const response = await apiService.get('/medical-records');
+      setMedicalRecords(response.data);
+      */
+      
     } catch (error: any) {
       console.error('Erro ao buscar prontuários:', error);
       setError(error.message || 'Erro ao carregar prontuários');

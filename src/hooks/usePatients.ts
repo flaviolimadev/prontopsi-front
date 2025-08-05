@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { usePacientes } from './usePacientes';
 
 export interface Patient {
   id: string;
@@ -163,123 +164,64 @@ const mockPatients: Patient[] = [
 ];
 
 export function usePatients() {
-  const [patients, setPatients] = useState<Patient[]>(mockPatients);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { 
+    pacientes, 
+    loading, 
+    error 
+  } = usePacientes();
+  
   const { toast } = useToast();
 
+  // Converter Paciente para Patient
+  const convertToPatient = (paciente: any): Patient => ({
+    id: paciente.id,
+    user_id: paciente.userId || 'user-1',
+    name: paciente.nome,
+    birth_date: paciente.nascimento,
+    phone: paciente.telefone,
+    email: paciente.email,
+    emergency_contact: paciente.contato_emergencia,
+    status: paciente.status === 1 ? 'ativo' : 'inativo',
+    notes: paciente.observacao_geral,
+    cpf: paciente.cpf,
+    address: paciente.endereco,
+    profession: paciente.profissao,
+    medication: paciente.medicacoes ? JSON.stringify(paciente.medicacoes) : undefined,
+    sessions_count: 0, // Será calculado através das sessões
+    last_session: undefined, // Será calculado através das sessões
+    gender: paciente.genero,
+    age_group: undefined, // Calcular baseado na idade
+    is_minor: false, // Calcular baseado na data de nascimento
+    guardian_name: undefined,
+    guardian_phone: undefined,
+    created_at: paciente.createdAt || new Date().toISOString(),
+    updated_at: paciente.updatedAt || new Date().toISOString()
+  });
+
+  // Converter pacientes para formato de exibição
+  const patients = pacientes.map(convertToPatient);
+
   const fetchPatients = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Simular delay de rede
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setPatients(mockPatients);
-    } catch (error: any) {
-      console.error('Erro ao buscar pacientes:', error);
-      setError(error.message || 'Erro ao carregar pacientes');
-      
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar os pacientes.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
+    // Dados já são carregados pelo hook usePacientes
+    return;
   };
 
   const createPatient = async (patientData: CreatePatientData): Promise<Patient | null> => {
-    try {
-      const newPatient: Patient = {
-        id: Date.now().toString(),
-        user_id: 'user-1',
-        name: patientData.name,
-        birth_date: patientData.birth_date,
-        phone: patientData.phone,
-        email: patientData.email,
-        emergency_contact: patientData.emergency_contact,
-        status: patientData.status || 'ativo',
-        notes: patientData.notes,
-        cpf: patientData.cpf,
-        address: patientData.address,
-        profession: patientData.profession,
-        medication: patientData.medication,
-        sessions_count: 0,
-        gender: patientData.gender,
-        age_group: patientData.age_group,
-        is_minor: patientData.is_minor,
-        guardian_name: patientData.guardian_name,
-        guardian_phone: patientData.guardian_phone,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      setPatients(prev => [newPatient, ...prev]);
-      
-      toast({
-        title: 'Sucesso',
-        description: 'Paciente criado com sucesso!',
-      });
-
-      return newPatient;
-    } catch (error: any) {
-      console.error('Erro ao criar paciente:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível criar o paciente.',
-        variant: 'destructive',
-      });
-      return null;
-    }
+    // Implementação simplificada - os dados vêm do hook usePacientes
+    console.log('createPatient não implementado - use usePacientes');
+    return null;
   };
 
   const updatePatient = async (id: string, patientData: UpdatePatientData): Promise<boolean> => {
-    try {
-      setPatients(prev => prev.map(patient => 
-        patient.id === id 
-          ? { ...patient, ...patientData, updated_at: new Date().toISOString() }
-          : patient
-      ));
-
-      toast({
-        title: 'Sucesso',
-        description: 'Paciente atualizado com sucesso!',
-      });
-
-      return true;
-    } catch (error: any) {
-      console.error('Erro ao atualizar paciente:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar o paciente.',
-        variant: 'destructive',
-      });
-      return false;
-    }
+    // Implementação simplificada - os dados vêm do hook usePacientes
+    console.log('updatePatient não implementado - use usePacientes');
+    return false;
   };
 
   const deletePatient = async (id: string): Promise<boolean> => {
-    try {
-      setPatients(prev => prev.filter(patient => patient.id !== id));
-
-      toast({
-        title: 'Sucesso',
-        description: 'Paciente removido com sucesso!',
-      });
-
-      return true;
-    } catch (error: any) {
-      console.error('Erro ao deletar paciente:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível remover o paciente.',
-        variant: 'destructive',
-      });
-      return false;
-    }
+    // Implementação simplificada - os dados vêm do hook usePacientes
+    console.log('deletePatient não implementado - use usePacientes');
+    return false;
   };
 
   const getPatientById = (id: string): Patient | undefined => {
@@ -291,12 +233,9 @@ export function usePatients() {
   };
 
   const retry = () => {
-    fetchPatients();
+    // Dados são recarregados automaticamente pelo hook usePacientes
+    return;
   };
-
-  useEffect(() => {
-    fetchPatients();
-  }, []);
 
   return {
     patients,

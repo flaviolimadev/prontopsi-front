@@ -36,6 +36,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home, description: "Visão geral" },
   { name: "Pacientes", href: "/pacientes", icon: Users, description: "Gerenciar pacientes" },
   { name: "Agenda", href: "/agenda", icon: Calendar, description: "Agendamentos" },
+  { name: "Prontuários", href: "/prontuarios", icon: FileText, description: "Prontuários psicológicos" },
   { name: "Financeiro", href: "/financeiro", icon: Wallet, description: "Controle financeiro" },
   { name: "Arquivos", href: "/arquivos", icon: MessageSquare, description: "Documentos" },
   { name: "Relatórios", href: "/relatorios", icon: FileText, description: "Análises" },

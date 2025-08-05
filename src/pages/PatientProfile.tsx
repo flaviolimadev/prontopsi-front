@@ -90,6 +90,9 @@ import {
 import { usePacientes } from "@/hooks/usePacientes";
 import { PacienteForm } from "@/components/pacientes/PacienteForm";
 import { apiService } from "@/services/api.service";
+import { useAgendaSessoesReal } from "@/hooks/useAgendaSessoesReal";
+import { usePagamentos } from "@/hooks/usePagamentos";
+import { useAddressSearch } from "@/hooks/useAddressSearch";
 
 export default function PatientProfile() {
   const { id: patientId } = useParams<{ id: string }>();
@@ -104,6 +107,9 @@ export default function PatientProfile() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isMedicationModalOpen, setIsMedicationModalOpen] = useState(false);
+  const [medications, setMedications] = useState<Array<{id: string, nome: string, prescricao: string}>>([]);
+  const [newMedication, setNewMedication] = useState({ nome: '', prescricao: '' });
 
   const {
     getPaciente,
@@ -113,6 +119,11 @@ export default function PatientProfile() {
     reactivatePaciente,
     loading: actionLoading
   } = usePacientes();
+
+  // Hooks para buscar dados relacionados
+  const { agendaSessoes } = useAgendaSessoesReal();
+  const { pagamentos } = usePagamentos();
+  const { loading: addressLoading, addressData, searchByCEP, searchByStreet, clearAddress } = useAddressSearch();
 
   const [editForm, setEditForm] = useState({
     name: "",
@@ -129,6 +140,15 @@ export default function PatientProfile() {
     gender: "",
     guardian_name: "",
     guardian_phone: "",
+  });
+
+  // Estados para busca de endereço
+  const [addressSearchType, setAddressSearchType] = useState<'cep' | 'street'>('cep');
+  const [addressSearchData, setAddressSearchData] = useState({
+    cep: '',
+    street: '',
+    city: '',
+    state: ''
   });
 
   const fetchPatientData = useCallback(async () => {
@@ -174,6 +194,14 @@ export default function PatientProfile() {
       };
 
       setPatient(convertedPatient);
+      
+      // Carregar medicamentos
+      if (pacienteData.medicacoes && Array.isArray(pacienteData.medicacoes)) {
+        setMedications(pacienteData.medicacoes);
+      } else {
+        setMedications([]);
+      }
+      
       setEditForm({
         name: convertedPatient.name,
         email: convertedPatient.email || "",
@@ -191,34 +219,40 @@ export default function PatientProfile() {
         guardian_phone: convertedPatient.guardian_phone || "",
       });
 
-      // Dados mockados relacionados (mantidos para preservar o visual)
-      setPatientAppointments([
-        {
-          id: '1',
-          patient_id: patientId,
-          date: '2024-01-20',
-          time: '14:00',
-          duration: 50,
-          type: 'consulta',
-          modality: 'presencial',
-          session_type: 'individual',
-          status: 'agendado',
-          notes: 'Sessão de acompanhamento'
-        }
-      ]);
+      // Buscar agendamentos reais do paciente
+      const patientAgendaSessoes = agendaSessoes.filter(sessao => sessao.pacienteId === patientId);
+      setPatientAppointments(patientAgendaSessoes.map(sessao => ({
+        id: sessao.id,
+        patient_id: sessao.pacienteId,
+        date: sessao.data,
+        time: sessao.horario,
+        duration: sessao.duracao,
+        type: sessao.tipoDaConsulta,
+        modality: sessao.modalidade,
+        session_type: sessao.tipoAtendimento,
+        status: sessao.status === 0 ? 'agendado' : 
+                sessao.status === 1 ? 'em_andamento' : 
+                sessao.status === 2 ? 'realizado' : 'cancelado',
+        notes: sessao.observacao,
+        value: sessao.value
+      })));
       
-      setPatientFinancials([
-        {
-          id: '1',
-          patient_id: patientId,
-          date: '2024-01-19',
-          amount: 150.00,
-          type: 'receita',
-          description: 'Sessão de psicoterapia',
-          payment_method: 'pix',
-          status: 'pago'
-        }
-      ]);
+      // Buscar pagamentos reais do paciente
+      const patientPagamentos = pagamentos.filter(pagamento => pagamento.pacienteId === patientId);
+      setPatientFinancials(patientPagamentos.map(pagamento => ({
+        id: pagamento.id,
+        patient_id: pagamento.pacienteId,
+        date: pagamento.data,
+        amount: Number(pagamento.value) || 0, // Converter para número e usar 0 como fallback
+        type: 'pagamento',
+        description: pagamento.descricao || 'Pagamento de sessão',
+        payment_method: pagamento.type === 1 ? 'pix' : 
+                       pagamento.type === 2 ? 'cartão' : 
+                       pagamento.type === 3 ? 'boleto' : 'espécie',
+        status: pagamento.status === 0 ? 'pendente' : 
+                pagamento.status === 1 ? 'pago' : 
+                pagamento.status === 2 ? 'confirmado' : 'cancelado'
+      })));
       
       setPatientRecords([
         {
@@ -258,6 +292,50 @@ export default function PatientProfile() {
   useEffect(() => {
     fetchPatientData();
   }, [fetchPatientData]);
+
+  // Atualizar dados relacionados quando os hooks carregarem
+  useEffect(() => {
+    if (patientId && agendaSessoes.length > 0) {
+      const patientAgendaSessoes = agendaSessoes.filter(sessao => sessao.pacienteId === patientId);
+      setPatientAppointments(patientAgendaSessoes.map(sessao => ({
+        id: sessao.id,
+        patient_id: sessao.pacienteId,
+        date: sessao.data,
+        time: sessao.horario,
+        duration: sessao.duracao,
+        type: sessao.tipoDaConsulta,
+        modality: sessao.modalidade,
+        session_type: sessao.tipoAtendimento,
+        status: sessao.status === 0 ? 'agendado' : 
+                sessao.status === 1 ? 'em_andamento' : 
+                sessao.status === 2 ? 'realizado' : 'cancelado',
+        notes: sessao.observacao,
+        value: sessao.value
+      })));
+    }
+  }, [patientId, agendaSessoes]);
+
+  useEffect(() => {
+    if (patientId && pagamentos.length > 0) {
+      const patientPagamentos = pagamentos.filter(pagamento => pagamento.pacienteId === patientId);
+      
+
+      setPatientFinancials(patientPagamentos.map(pagamento => ({
+        id: pagamento.id,
+        patient_id: pagamento.pacienteId,
+        date: pagamento.data,
+        amount: Number(pagamento.value) || 0, // Converter para número e usar 0 como fallback
+        type: 'pagamento',
+        description: pagamento.descricao || 'Pagamento de sessão',
+        payment_method: pagamento.type === 1 ? 'pix' : 
+                       pagamento.type === 2 ? 'cartão' : 
+                       pagamento.type === 3 ? 'boleto' : 'espécie',
+        status: pagamento.status === 0 ? 'pendente' : 
+                pagamento.status === 1 ? 'pago' : 
+                pagamento.status === 2 ? 'confirmado' : 'cancelado'
+      })));
+    }
+  }, [patientId, pagamentos]);
 
   const handleEditPatient = async () => {
     try {
@@ -329,6 +407,120 @@ export default function PatientProfile() {
     }
   };
 
+  const handleAddMedication = async () => {
+    if (!newMedication.nome.trim() || !newMedication.prescricao.trim()) {
+      toast({
+        title: "Erro",
+        description: "Nome e prescrição do medicamento são obrigatórios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const medicationToAdd = {
+        id: Date.now().toString(), // ID temporário
+        nome: newMedication.nome.trim(),
+        prescricao: newMedication.prescricao.trim()
+      };
+
+      const updatedMedications = [...medications, medicationToAdd];
+      
+      // Debug: verificar dados antes de enviar
+      console.log('Dados sendo enviados para o backend:', {
+        patientId,
+        pacienteData: { medicacoes: updatedMedications }
+      });
+      
+      // Atualizar no backend - enviar apenas o campo medicacoes
+      const pacienteData = {
+        medicacoes: updatedMedications
+      };
+
+      const result = await updatePaciente(patientId, pacienteData);
+      
+      // Debug: verificar resposta do backend
+      console.log('Resposta do backend:', result);
+      
+      // Atualizar estado local
+      setMedications(updatedMedications);
+      setNewMedication({ nome: '', prescricao: '' });
+      
+      toast({
+        title: "Sucesso",
+        description: "Medicamento adicionado com sucesso.",
+      });
+    } catch (error: any) {
+      console.error('Erro ao adicionar medicamento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao adicionar medicamento.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatCEP = (cep: string) => {
+    const cleanCEP = cep.replace(/\D/g, '');
+    if (cleanCEP.length <= 5) {
+      return cleanCEP;
+    }
+    return `${cleanCEP.slice(0, 5)}-${cleanCEP.slice(5, 8)}`;
+  };
+
+  const handleSearchAddress = async () => {
+    if (addressSearchType === 'cep') {
+      const result = await searchByCEP(addressSearchData.cep);
+      if (result) {
+        const fullAddress = `${result.logradouro}, ${result.bairro}, ${result.localidade} - ${result.uf}, CEP: ${result.cep}`;
+        setEditForm(prev => ({ ...prev, address: fullAddress }));
+      }
+    } else {
+      const result = await searchByStreet(addressSearchData.street, addressSearchData.city, addressSearchData.state);
+      if (result) {
+        const fullAddress = `${result.logradouro}, ${result.bairro}, ${result.localidade} - ${result.uf}, CEP: ${result.cep}`;
+        setEditForm(prev => ({ ...prev, address: fullAddress }));
+      }
+    }
+  };
+
+  const handleRemoveMedication = async (medicationId: string) => {
+    try {
+      const updatedMedications = medications.filter(med => med.id !== medicationId);
+      
+      // Debug: verificar dados antes de enviar
+      console.log('Removendo medicamento - dados sendo enviados:', {
+        patientId,
+        pacienteData: { medicacoes: updatedMedications }
+      });
+      
+      // Atualizar no backend - enviar apenas o campo medicacoes
+      const pacienteData = {
+        medicacoes: updatedMedications
+      };
+
+      const result = await updatePaciente(patientId, pacienteData);
+      
+      // Debug: verificar resposta do backend
+      console.log('Resposta do backend (remoção):', result);
+      
+      // Atualizar estado local
+      setMedications(updatedMedications);
+      
+      toast({
+        title: "Sucesso",
+        description: "Medicamento removido com sucesso.",
+      });
+    } catch (error: any) {
+      console.error('Erro ao remover medicamento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao remover medicamento.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleStatusChange = async () => {
     try {
       if (patient.status === "ativo") {
@@ -369,6 +561,11 @@ export default function PatientProfile() {
   };
 
   const formatCurrency = (value: number) => {
+    // Verificar se o valor é válido
+    if (value === null || value === undefined || isNaN(value)) {
+      return 'R$ 0,00';
+    }
+    
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
@@ -433,13 +630,13 @@ export default function PatientProfile() {
                     }
                   </span>
                   {patient.phone && (
-                    <span className="flex items-center gap-2">
+                    <span key="phone" className="flex items-center gap-2">
                       <Phone className="w-5 h-5" />
                       {patient.phone}
                     </span>
                   )}
                   {patient.email && (
-                    <span className="flex items-center gap-2">
+                    <span key="email" className="flex items-center gap-2">
                       <Mail className="w-5 h-5" />
                       {patient.email}
                     </span>
@@ -453,12 +650,12 @@ export default function PatientProfile() {
                     {patient.status === "ativo" ? "✓ Paciente Ativo" : "Paciente Inativo"}
                   </Badge>
                   {patient.age_group && (
-                    <Badge variant="outline" className="bg-white/10 dark:bg-white/5 text-white border-white/20 dark:border-white/10 text-base px-4 py-2">
+                    <Badge key="age-group" variant="outline" className="bg-white/10 dark:bg-white/5 text-white border-white/20 dark:border-white/10 text-base px-4 py-2">
                       {patient.age_group}
                     </Badge>
                   )}
                   {patient.is_minor && (
-                    <Badge variant="outline" className="bg-yellow-500/15 dark:bg-yellow-400/10 text-white border-yellow-300/20 dark:border-yellow-400/10 text-base px-4 py-2">
+                    <Badge key="is-minor" variant="outline" className="bg-yellow-500/15 dark:bg-yellow-400/10 text-white border-yellow-300/20 dark:border-yellow-400/10 text-base px-4 py-2">
                       <Shield className="w-4 h-4 mr-2" />
                       Menor de Idade
                     </Badge>
@@ -480,15 +677,15 @@ export default function PatientProfile() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleStatusChange}>
                   {patient.status === "ativo" ? (
-                    <>
+                    <div key="desativar" className="flex items-center">
                       <XCircle className="w-4 h-4 mr-2" />
                       Desativar Paciente
-                    </>
+                    </div>
                   ) : (
-                    <>
+                    <div key="ativar" className="flex items-center">
                       <CheckCircle2 className="w-4 h-4 mr-2" />
                       Ativar Paciente
-                    </>
+                    </div>
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleDeletePatient} className="text-red-600">
@@ -532,8 +729,11 @@ export default function PatientProfile() {
                   <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                     {formatCurrency(
                       patientFinancials
-                        .filter(f => f.type === "pagamento" && f.status === "pago")
-                        .reduce((sum, f) => sum + f.amount, 0)
+                        .filter(f => f.status === "pago" || f.status === "confirmado")
+                        .reduce((sum, f) => {
+                          const amount = Number(f.amount) || 0;
+                          return sum + amount;
+                        }, 0)
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -702,7 +902,7 @@ export default function PatientProfile() {
                 
                 {/* Informações Médicas e Observações */}
                 {(patient.emergency_contact || patient.medication || patient.notes) && (
-                  <>
+                  <div key="medical-info">
                     <Separator className="my-10" />
                     <div className="space-y-8">
                       <h4 className="font-bold text-xl flex items-center gap-3 text-primary border-b pb-3">
@@ -711,7 +911,7 @@ export default function PatientProfile() {
                       </h4>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {patient.emergency_contact && (
-                          <div className="flex items-start gap-4">
+                          <div key="emergency-contact" className="flex items-start gap-4">
                             <AlertCircle className="w-6 h-6 text-red-500 mt-1" />
                             <div className="flex-1">
                               <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Contato de Emergência</p>
@@ -719,18 +919,50 @@ export default function PatientProfile() {
                             </div>
                           </div>
                         )}
-                        {patient.medication && (
-                          <div className="flex items-start gap-4">
-                            <Heart className="w-6 h-6 text-orange-500 mt-1" />
-                            <div className="flex-1">
+                        <div className="flex items-start gap-4">
+                          <Heart className="w-6 h-6 text-orange-500 mt-1" />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
                               <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Medicações</p>
-                              <p className="text-lg font-medium">{patient.medication}</p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsMedicationModalOpen(true)}
+                                className="text-xs"
+                              >
+                                <Plus className="w-3 h-3 mr-1" />
+                                Gerenciar
+                              </Button>
                             </div>
+                            {medications.length > 0 ? (
+                              <div className="space-y-2">
+                                {medications.map((med, idx) => (
+                                  <div key={med.id || idx} className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border border-orange-200 dark:border-orange-800/30">
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1">
+                                        <p className="font-medium text-orange-900 dark:text-orange-100">{med.nome}</p>
+                                        <p className="text-sm text-orange-700 dark:text-orange-300">{med.prescricao}</p>
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRemoveMedication(med.id)}
+                                        className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-200"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-lg font-medium text-muted-foreground">Nenhuma medicação registrada</p>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
                       {patient.notes && (
-                        <div className="flex items-start gap-4 mt-6">
+                        <div key="notes" className="flex items-start gap-4 mt-6">
                           <MessageSquare className="w-6 h-6 text-blue-500 mt-1" />
                           <div className="flex-1">
                             <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Observações Gerais</p>
@@ -739,7 +971,7 @@ export default function PatientProfile() {
                         </div>
                       )}
                     </div>
-                  </>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -751,8 +983,18 @@ export default function PatientProfile() {
               <CardContent className="p-10">
                 <div className="text-center">
                   <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">Prontuário Médico</h3>
-                  <p className="text-muted-foreground">Seção em desenvolvimento</p>
+                  <h3 className="text-xl font-semibold mb-2">Prontuário Psicológico</h3>
+                  <p className="text-muted-foreground mb-6">
+                    Acesse o prontuário completo com todas as informações do paciente, 
+                    avaliação da demanda, evolução das sessões e anexos.
+                  </p>
+                  <Button 
+                    onClick={() => navigate(`/prontuarios/${patientId}`)}
+                    className="gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Acessar Prontuário Completo
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -760,24 +1002,234 @@ export default function PatientProfile() {
 
           <TabsContent value="sessoes" className="space-y-6 mt-10">
             <Card className="shadow-xl">
-              <CardContent className="p-10">
-                <div className="text-center">
-                  <Clock className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">Histórico de Sessões</h3>
-                  <p className="text-muted-foreground">Seção em desenvolvimento</p>
-                </div>
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
+                <CardTitle className="text-2xl flex items-center gap-3">
+                  <Clock className="w-6 h-6" />
+                  Histórico de Sessões
+                </CardTitle>
+                <CardDescription>
+                  Todas as sessões agendadas e realizadas para este paciente
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                {patientAppointments.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Clock className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">Nenhuma sessão encontrada</h3>
+                    <p className="text-muted-foreground">Este paciente ainda não possui sessões agendadas.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-6">
+                      <h4 className="text-lg font-semibold">Total de Sessões: {patientAppointments.length}</h4>
+                      <Badge variant="outline" className="text-sm">
+                        {patientAppointments.filter(a => a.status === "realizado").length} realizadas
+                      </Badge>
+                    </div>
+                    
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Horário</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Modalidade</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Valor</TableHead>
+                          <TableHead>Observações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {patientAppointments
+                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                          .map((appointment) => (
+                          <TableRow key={appointment.id}>
+                            <TableCell className="font-medium">
+                              {format(new Date(appointment.date), "dd/MM/yyyy", { locale: ptBR })}
+                            </TableCell>
+                            <TableCell>{appointment.time}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {appointment.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {appointment.modality}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={
+                                  appointment.status === "realizado" ? "default" :
+                                  appointment.status === "agendado" ? "secondary" :
+                                  appointment.status === "em_andamento" ? "outline" : "destructive"
+                                }
+                                className="text-xs"
+                              >
+                                {appointment.status === "realizado" ? "✓ Realizado" :
+                                 appointment.status === "agendado" ? "⏰ Agendado" :
+                                 appointment.status === "em_andamento" ? "🔄 Em Andamento" : "❌ Cancelado"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {appointment.value ? formatCurrency(appointment.value) : "-"}
+                            </TableCell>
+                            <TableCell className="max-w-xs truncate">
+                              {appointment.notes || "-"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="financeiro" className="space-y-6 mt-10">
             <Card className="shadow-xl">
-              <CardContent className="p-10">
-                <div className="text-center">
-                  <DollarSign className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">Registros Financeiros</h3>
-                  <p className="text-muted-foreground">Seção em desenvolvimento</p>
-                </div>
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
+                <CardTitle className="text-2xl flex items-center gap-3">
+                  <DollarSign className="w-6 h-6" />
+                  Registros Financeiros
+                </CardTitle>
+                <CardDescription>
+                  Histórico completo de pagamentos e transações financeiras
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                {patientFinancials.length === 0 ? (
+                  <div className="text-center py-12">
+                    <DollarSign className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">Nenhum registro financeiro</h3>
+                    <p className="text-muted-foreground">Este paciente ainda não possui registros financeiros.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Resumo Financeiro */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <Card className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800/30">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            <span className="text-sm font-semibold text-green-800 dark:text-green-200">Total Pago</span>
+                          </div>
+                          <div className="text-xl font-bold text-green-900 dark:text-green-100">
+                            {formatCurrency(
+                              patientFinancials
+                                .filter(f => f.status === "pago" || f.status === "confirmado")
+                                .reduce((sum, f) => sum + f.amount, 0)
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800/30">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                            <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">Pendente</span>
+                          </div>
+                          <div className="text-xl font-bold text-yellow-900 dark:text-yellow-100">
+                            {formatCurrency(
+                              patientFinancials
+                                .filter(f => f.status === "pendente")
+                                .reduce((sum, f) => {
+                                  const amount = Number(f.amount) || 0;
+                                  return sum + amount;
+                                }, 0)
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/30">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                            <span className="text-sm font-semibold text-red-800 dark:text-red-200">Cancelado</span>
+                          </div>
+                          <div className="text-xl font-bold text-red-900 dark:text-red-100">
+                            {formatCurrency(
+                              patientFinancials
+                                .filter(f => f.status === "cancelado")
+                                .reduce((sum, f) => sum + f.amount, 0)
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/30">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Activity className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">Total Geral</span>
+                          </div>
+                          <div className="text-xl font-bold text-blue-900 dark:text-blue-100">
+                            {formatCurrency(
+                              patientFinancials
+                                .reduce((sum, f) => sum + f.amount, 0)
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Tabela de Pagamentos */}
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-semibold">Histórico de Pagamentos</h4>
+                      
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Data</TableHead>
+                            <TableHead>Descrição</TableHead>
+                            <TableHead>Valor</TableHead>
+                            <TableHead>Método</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {patientFinancials
+                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                            .map((payment) => (
+                            <TableRow key={payment.id}>
+                              <TableCell className="font-medium">
+                                {format(new Date(payment.date), "dd/MM/yyyy", { locale: ptBR })}
+                              </TableCell>
+                              <TableCell className="max-w-xs truncate">
+                                {payment.description}
+                              </TableCell>
+                              <TableCell className="font-bold">
+                                {formatCurrency(payment.amount)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs">
+                                  {payment.payment_method}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={
+                                    payment.status === "pago" || payment.status === "confirmado" ? "default" :
+                                    payment.status === "pendente" ? "secondary" : "destructive"
+                                  }
+                                  className="text-xs"
+                                >
+                                  {payment.status === "pago" ? "✓ Pago" :
+                                   payment.status === "confirmado" ? "✓ Confirmado" :
+                                   payment.status === "pendente" ? "⏰ Pendente" : "❌ Cancelado"}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -796,7 +1248,14 @@ export default function PatientProfile() {
         </Tabs>
 
         {/* Modal de Edição */}
-        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <Dialog open={isEditModalOpen} onOpenChange={(open) => {
+          setIsEditModalOpen(open);
+          if (!open) {
+            // Limpar dados de busca quando fechar o modal
+            setAddressSearchData({ cep: '', street: '', city: '', state: '' });
+            clearAddress();
+          }
+        }}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Editar Informações do Paciente</DialogTitle>
@@ -850,13 +1309,113 @@ export default function PatientProfile() {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Endereço</Label>
-                <Input
-                  placeholder="Endereço completo"
-                  value={editForm.address}
-                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Buscar Endereço</Label>
+                  <div className="flex gap-2">
+                    <Select value={addressSearchType} onValueChange={(value: 'cep' | 'street') => setAddressSearchType(value)}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cep">Por CEP</SelectItem>
+                        <SelectItem value="street">Por Rua</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSearchAddress}
+                      disabled={addressLoading}
+                      className="flex-shrink-0"
+                    >
+                      {addressLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <MapPin className="w-4 h-4" />
+                      )}
+                      Buscar
+                    </Button>
+                  </div>
+                </div>
+
+                {addressSearchType === 'cep' ? (
+                  <div className="space-y-2">
+                    <Label>CEP</Label>
+                    <Input
+                      placeholder="00000-000"
+                      value={addressSearchData.cep}
+                      onChange={(e) => setAddressSearchData({ ...addressSearchData, cep: formatCEP(e.target.value) })}
+                      maxLength={9}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-2">
+                      <Label>Rua</Label>
+                      <Input
+                        placeholder="Nome da rua"
+                        value={addressSearchData.street}
+                        onChange={(e) => setAddressSearchData({ ...addressSearchData, street: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Cidade</Label>
+                      <Input
+                        placeholder="Nome da cidade"
+                        value={addressSearchData.city}
+                        onChange={(e) => setAddressSearchData({ ...addressSearchData, city: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Estado</Label>
+                      <Select value={addressSearchData.state} onValueChange={(value) => setAddressSearchData({ ...addressSearchData, state: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="UF" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AC">AC</SelectItem>
+                          <SelectItem value="AL">AL</SelectItem>
+                          <SelectItem value="AP">AP</SelectItem>
+                          <SelectItem value="AM">AM</SelectItem>
+                          <SelectItem value="BA">BA</SelectItem>
+                          <SelectItem value="CE">CE</SelectItem>
+                          <SelectItem value="DF">DF</SelectItem>
+                          <SelectItem value="ES">ES</SelectItem>
+                          <SelectItem value="GO">GO</SelectItem>
+                          <SelectItem value="MA">MA</SelectItem>
+                          <SelectItem value="MT">MT</SelectItem>
+                          <SelectItem value="MS">MS</SelectItem>
+                          <SelectItem value="MG">MG</SelectItem>
+                          <SelectItem value="PA">PA</SelectItem>
+                          <SelectItem value="PB">PB</SelectItem>
+                          <SelectItem value="PR">PR</SelectItem>
+                          <SelectItem value="PE">PE</SelectItem>
+                          <SelectItem value="PI">PI</SelectItem>
+                          <SelectItem value="RJ">RJ</SelectItem>
+                          <SelectItem value="RN">RN</SelectItem>
+                          <SelectItem value="RS">RS</SelectItem>
+                          <SelectItem value="RO">RO</SelectItem>
+                          <SelectItem value="RR">RR</SelectItem>
+                          <SelectItem value="SC">SC</SelectItem>
+                          <SelectItem value="SP">SP</SelectItem>
+                          <SelectItem value="SE">SE</SelectItem>
+                          <SelectItem value="TO">TO</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Endereço Completo</Label>
+                  <Textarea
+                    placeholder="Endereço completo (será preenchido automaticamente ou pode ser editado manualmente)"
+                    value={editForm.address}
+                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    rows={3}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Profissão</Label>
@@ -874,6 +1433,89 @@ export default function PatientProfile() {
               <Button onClick={handleEditPatient}>
                 <Save className="w-4 h-4 mr-2" />
                 Salvar Alterações
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Gerenciamento de Medicamentos */}
+        <Dialog open={isMedicationModalOpen} onOpenChange={setIsMedicationModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Heart className="w-5 h-5 text-orange-500" />
+                Gerenciar Medicações
+              </DialogTitle>
+              <DialogDescription>
+                Adicione, edite ou remova medicamentos do paciente
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              {/* Lista de medicamentos existentes */}
+              {medications.filter(Boolean).length > 0 && (
+                <div key="existing-medications" className="space-y-4">
+                  <h4 className="font-semibold text-sm">Medicações Atuais</h4>
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {medications.filter(Boolean).map((med, idx) => (
+                      <div key={med.id || idx} className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800/30">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium text-orange-900 dark:text-orange-100">{med.nome}</p>
+                            <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">{med.prescricao}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveMedication(med.id)}
+                            className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-200"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Formulário para adicionar novo medicamento */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm">Adicionar Nova Medicação</h4>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="medication-name">Nome do Medicamento *</Label>
+                    <Input
+                      id="medication-name"
+                      placeholder="Ex: Paracetamol, Ibuprofeno..."
+                      value={newMedication.nome}
+                      onChange={(e) => setNewMedication({ ...newMedication, nome: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="medication-prescription">Prescrição *</Label>
+                    <Textarea
+                      id="medication-prescription"
+                      placeholder="Ex: 1 comprimido de 500mg a cada 6 horas, com alimentos..."
+                      value={newMedication.prescricao}
+                      onChange={(e) => setNewMedication({ ...newMedication, prescricao: e.target.value })}
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsMedicationModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleAddMedication}
+                disabled={!newMedication.nome.trim() || !newMedication.prescricao.trim()}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar Medicamento
               </Button>
             </DialogFooter>
           </DialogContent>

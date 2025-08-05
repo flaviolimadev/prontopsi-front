@@ -111,6 +111,16 @@ function App() {
                   }
                 />
                 <Route
+                  path="/prontuarios/:patientId"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Prontuarios />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/financeiro"
                   element={
                     <ProtectedRoute>

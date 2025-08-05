@@ -1,0 +1,33 @@
+# Docker Compose para ProntuPsi Frontend
+version: '3.8'
+
+services:
+  prontupsi-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: prontupsi-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - prontupsi-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prontupsi-frontend.rule=Host(`prontupsi.yourdomain.com`)"
+      - "traefik.http.routers.prontupsi-frontend.tls=true"
+      - "traefik.http.routers.prontupsi-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.prontupsi-frontend.loadbalancer.server.port=80"
+
+networks:
+  prontupsi-network:
+    external: true

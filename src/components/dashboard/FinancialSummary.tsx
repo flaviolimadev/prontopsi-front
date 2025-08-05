@@ -2,22 +2,36 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, TrendingUp, AlertTriangle, Calendar } from 'lucide-react';
-import { useFinancials } from '@/hooks/useFinancials';
+import { DollarSign, TrendingUp, AlertTriangle, Calendar, CheckCircle, Clock, XCircle, CreditCard } from 'lucide-react';
+import { usePagamentos } from '@/hooks/usePagamentos';
 
 export function FinancialSummary() {
-  const { financialRecords: financials = [] } = useFinancials();
+  const { pagamentos = [], loading, error } = usePagamentos();
+
+
+
+
 
   const financialData = useMemo(() => {
+    // Usar APENAS dados reais do backend
+
     // Verificar se os dados existem antes de processar
-    if (!financials || financials.length === 0) {
+    if (!pagamentos || pagamentos.length === 0) {
       return {
         monthlyRevenue: 0,
         projectedRevenue: 0,
         overduePayments: 0,
         overdueAmount: 0,
         averageSession: 0,
-        monthlyData: []
+        monthlyData: [],
+        paidTotal: 0,
+        pendingTotal: 0,
+        canceledTotal: 0,
+        paidCount: 0,
+        pendingCount: 0,
+        canceledCount: 0,
+        projectedFromPending: 0,
+        totalForecast: 0
       };
     }
 
@@ -25,42 +39,59 @@ export function FinancialSummary() {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     
-    // Receita do mês atual
-    const monthlyRevenue = financials
-      .filter(f => {
-        const date = new Date(f.date);
-        return date.getMonth() === currentMonth && 
-               date.getFullYear() === currentYear && 
-               f.status === "pago";
-      })
-      .reduce((total, f) => total + f.amount, 0);
+    // Filtrar pagamentos do mês atual (mesma lógica da página Financeiro)
+    const currentMonthPayments = pagamentos.filter(pagamento => {
+      const paymentDate = new Date(pagamento.data);
+      return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
+    });
+
+
+
+    // Receita do mês atual (status 1 = Pago, status 2 = Confirmado)
+    const monthlyRevenue = currentMonthPayments
+      .filter(p => p.status === 1 || p.status === 2)
+      .reduce((sum, p) => sum + Number(p.value || 0), 0);
+
+    // Pagamentos pendentes do mês atual (status 0 = Pendente)
+    const monthlyPending = currentMonthPayments
+      .filter(p => p.status === 0)
+      .reduce((sum, p) => sum + Number(p.value || 0), 0);
 
     // Pagamentos em atraso (mais de 7 dias)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
-    const overduePayments = financials.filter(f => 
-      f.status === "pendente" && new Date(f.date) < sevenDaysAgo
+    const overduePayments = pagamentos.filter(p => 
+      p.status === 0 && new Date(p.data) < sevenDaysAgo
     );
     
-    const overdueAmount = overduePayments.reduce((total, f) => total + f.amount, 0);
+    const overdueAmount = overduePayments.reduce((sum, p) => sum + Number(p.value || 0), 0);
 
-    // Valor médio por sessão (últimos 3 meses)
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    
-    const recentPayments = financials.filter(f => 
-      new Date(f.date) >= threeMonthsAgo && f.status === "pago"
-    );
-    
-    const averageSession = recentPayments.length > 0 
-      ? recentPayments.reduce((total, f) => total + f.amount, 0) / recentPayments.length
-      : 0;
+    // Valor médio por sessão (todos os tempos)
+    const averageSession = currentMonthPayments.length > 0 ? 
+      currentMonthPayments.reduce((sum, p) => sum + Number(p.value || 0), 0) / currentMonthPayments.length : 0;
+
+    // Cálculos detalhados por status (todos os tempos)
+    const paidPayments = pagamentos.filter(p => p.status === 1 || p.status === 2);
+    const pendingPayments = pagamentos.filter(p => p.status === 0);
+    const canceledPayments = pagamentos.filter(p => p.status === 3); // status 3 = Cancelado
+
+    const paidTotal = paidPayments.reduce((sum, p) => sum + Number(p.value || 0), 0);
+    const pendingTotal = pendingPayments.reduce((sum, p) => sum + Number(p.value || 0), 0);
+    const canceledTotal = canceledPayments.reduce((sum, p) => sum + Number(p.value || 0), 0);
+
+    const paidCount = paidPayments.length;
+    const pendingCount = pendingPayments.length;
+    const canceledCount = canceledPayments.length;
+
+    // Projeção baseada nos pendentes (assumindo 70% de conversão)
+    const projectedFromPending = pendingTotal * 0.7;
+    const totalForecast = paidTotal + projectedFromPending;
 
     // Projeção do mês (baseada no dia atual)
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const currentDay = now.getDate();
-    const projectedRevenue = (monthlyRevenue / currentDay) * daysInMonth;
+    const projectedRevenue = currentDay > 0 ? (monthlyRevenue / currentDay) * daysInMonth : 0;
 
     // Últimos 6 meses para gráfico simples
     const monthlyData = [];
@@ -70,14 +101,14 @@ export function FinancialSummary() {
       const month = date.getMonth();
       const year = date.getFullYear();
       
-      const monthRevenue = financials
-        .filter(f => {
-          const fDate = new Date(f.date);
-          return fDate.getMonth() === month && 
-                 fDate.getFullYear() === year && 
-                 f.status === "pago";
+      const monthRevenue = pagamentos
+        .filter(p => {
+          const pDate = new Date(p.data);
+          return pDate.getMonth() === month && 
+                 pDate.getFullYear() === year && 
+                 (p.status === 1 || p.status === 2); // Pago ou Confirmado
         })
-        .reduce((total, f) => total + f.amount, 0);
+        .reduce((sum, p) => sum + Number(p.value || 0), 0);
       
       monthlyData.push({
         month: date.toLocaleDateString('pt-BR', { month: 'short' }),
@@ -91,9 +122,19 @@ export function FinancialSummary() {
       overduePayments: overduePayments.length,
       overdueAmount,
       averageSession,
-      monthlyData
+      monthlyData,
+      paidTotal,
+      pendingTotal,
+      canceledTotal,
+      paidCount,
+      pendingCount,
+      canceledCount,
+      projectedFromPending,
+      totalForecast
     };
-  }, [financials]);
+  }, [pagamentos]);
+
+  console.log('FinancialSummary - Dados calculados:', financialData);
 
   const maxMonthlyRevenue = financialData.monthlyData.length > 0 
     ? Math.max(...financialData.monthlyData.map(m => m.revenue))
@@ -112,8 +153,17 @@ export function FinancialSummary() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 relative z-10">
-        {/* Estatísticas Rápidas */}
-        <div className="grid grid-cols-2 gap-3">
+        {loading && (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-sm text-muted-foreground">Carregando dados financeiros...</p>
+          </div>
+        )}
+        
+        {!loading && (
+          <>
+            {/* Estatísticas Rápidas */}
+            <div className="grid grid-cols-2 gap-3">
           <div className="bg-muted/30 rounded-lg p-4 border border-border/50 hover:bg-muted/40 transition-colors">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Projeção do Mês</div>
             <div className="font-bold text-lg text-foreground">
@@ -178,6 +228,82 @@ export function FinancialSummary() {
           </div>
         )}
 
+        {/* Resumo Detalhado do Faturamento */}
+        <div className="space-y-4">
+          <h4 className="font-semibold text-sm text-foreground">Resumo Detalhado do Faturamento</h4>
+          
+          {/* Faturado vs Previsão */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800/30">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span className="text-sm font-semibold text-green-800 dark:text-green-200">Faturado</span>
+              </div>
+              <div className="text-xl font-bold text-green-900 dark:text-green-100">
+                R$ {financialData.paidTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                {financialData.paidCount} pagamento{financialData.paidCount !== 1 ? 's' : ''} recebido{financialData.paidCount !== 1 ? 's' : ''}
+              </p>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800/30">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">Previsão Total</span>
+              </div>
+              <div className="text-xl font-bold text-blue-900 dark:text-blue-100">
+                R$ {financialData.totalForecast.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                Incluindo 70% dos pendentes
+              </p>
+            </div>
+          </div>
+
+          {/* Status dos Pagamentos */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-3 border border-yellow-200 dark:border-yellow-800/30 text-center">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <Clock className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-xs font-medium text-yellow-800 dark:text-yellow-200">Pendentes</span>
+              </div>
+              <div className="text-sm font-bold text-yellow-900 dark:text-yellow-100">
+                R$ {financialData.pendingTotal.toLocaleString('pt-BR')}
+              </div>
+              <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                {financialData.pendingCount} pag.
+              </p>
+            </div>
+
+            <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 border border-red-200 dark:border-red-800/30 text-center">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <XCircle className="w-3 h-3 text-red-600 dark:text-red-400" />
+                <span className="text-xs font-medium text-red-800 dark:text-red-200">Cancelados</span>
+              </div>
+              <div className="text-sm font-bold text-red-900 dark:text-red-100">
+                R$ {financialData.canceledTotal.toLocaleString('pt-BR')}
+              </div>
+              <p className="text-xs text-red-700 dark:text-red-300">
+                {financialData.canceledCount} pag.
+              </p>
+            </div>
+
+            <div className="bg-purple-50 dark:bg-purple-950/20 rounded-lg p-3 border border-purple-200 dark:border-purple-800/30 text-center">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <CreditCard className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                <span className="text-xs font-medium text-purple-800 dark:text-purple-200">A Receber</span>
+              </div>
+              <div className="text-sm font-bold text-purple-900 dark:text-purple-100">
+                R$ {financialData.projectedFromPending.toLocaleString('pt-BR')}
+              </div>
+              <p className="text-xs text-purple-700 dark:text-purple-300">
+                Previsão
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Resumo Mensal */}
         <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
           <div className="flex items-center justify-between mb-2">
@@ -191,9 +317,11 @@ export function FinancialSummary() {
             R$ {financialData.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Baseado em {financialData.monthlyData.length > 0 ? financialData.monthlyData[financialData.monthlyData.length - 1].revenue : 0} transações
+            {pagamentos.length === 0 ? 'Nenhum pagamento registrado' : `Baseado em ${pagamentos.length} pagamentos`}
           </p>
         </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useAgendaSessoesReal } from './useAgendaSessoesReal';
 
 export interface Appointment {
   id: string;
@@ -157,115 +158,94 @@ const mockAppointments: Appointment[] = [
 ];
 
 export function useAppointments() {
-  const [appointments, setAppointments] = useState<Appointment[]>(mockAppointments);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { 
+    agendaSessoes, 
+    loading, 
+    error, 
+    createAgendaSessao,
+    updateAgendaSessao,
+    deleteAgendaSessao,
+    getAgendaSessaoById,
+    getAgendaSessoesByDate,
+    getAgendaSessoesByPatient,
+    getTodayAgendaSessoes
+  } = useAgendaSessoesReal();
+  
   const { toast } = useToast();
 
+  // Converter AgendaSessao para Appointment
+  const convertToAppointment = (agendaSessao: any): Appointment => ({
+    id: agendaSessao.id,
+    user_id: agendaSessao.userId,
+    patient_id: agendaSessao.pacienteId,
+    date: agendaSessao.data,
+    time: agendaSessao.horario,
+    duration: agendaSessao.duracao,
+    type: agendaSessao.tipo,
+    modality: agendaSessao.modalidade,
+    session_type: 'individual', // Assumindo individual como padrão
+    status: agendaSessao.status,
+    notes: agendaSessao.observacoes,
+    created_at: agendaSessao.createdAt,
+    updated_at: agendaSessao.updatedAt
+  });
+
+  // Converter appointments para formato de exibição
+  const appointments = agendaSessoes.map(convertToAppointment);
+
   const fetchAppointments = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Simular delay de rede
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setAppointments(mockAppointments);
-    } catch (error: any) {
-      console.error('Erro ao buscar consultas:', error);
-      setError(error.message || 'Erro ao carregar consultas');
-      
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar as consultas.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
+    // Dados já são carregados pelo hook useAgendaSessoesReal
+    return;
   };
 
   const createAppointment = async (appointmentData: CreateAppointmentData): Promise<Appointment | null> => {
     try {
-      const newAppointment: Appointment = {
-        id: Date.now().toString(),
-        user_id: 'user-1',
-        patient_id: appointmentData.patient_id,
-        date: appointmentData.date,
-        time: appointmentData.time,
-        duration: appointmentData.duration,
-        type: appointmentData.type,
-        modality: appointmentData.modality,
-        session_type: appointmentData.session_type,
+      const agendaSessaoData = {
+        pacienteId: appointmentData.patient_id,
+        data: appointmentData.date,
+        horario: appointmentData.time,
+        duracao: appointmentData.duration,
+        tipo: appointmentData.type,
+        modalidade: appointmentData.modality,
         status: appointmentData.status || 'agendado',
-        notes: appointmentData.notes,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        observacoes: appointmentData.notes
       };
 
-      setAppointments(prev => [newAppointment, ...prev]);
+      const newAgendaSessao = await createAgendaSessao(agendaSessaoData);
       
-      toast({
-        title: 'Sucesso',
-        description: 'Consulta agendada com sucesso!',
-      });
-
-      return newAppointment;
+      if (newAgendaSessao) {
+        return convertToAppointment(newAgendaSessao);
+      }
+      
+      return null;
     } catch (error: any) {
       console.error('Erro ao criar consulta:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível agendar a consulta.',
-        variant: 'destructive',
-      });
       return null;
     }
   };
 
   const updateAppointment = async (id: string, appointmentData: UpdateAppointmentData): Promise<boolean> => {
     try {
-      setAppointments(prev => prev.map(appointment => 
-        appointment.id === id 
-          ? { ...appointment, ...appointmentData, updated_at: new Date().toISOString() }
-          : appointment
-      ));
+      const agendaSessaoData: any = {};
+      
+      if (appointmentData.patient_id) agendaSessaoData.pacienteId = appointmentData.patient_id;
+      if (appointmentData.date) agendaSessaoData.data = appointmentData.date;
+      if (appointmentData.time) agendaSessaoData.horario = appointmentData.time;
+      if (appointmentData.duration) agendaSessaoData.duracao = appointmentData.duration;
+      if (appointmentData.type) agendaSessaoData.tipo = appointmentData.type;
+      if (appointmentData.modality) agendaSessaoData.modalidade = appointmentData.modality;
+      if (appointmentData.status) agendaSessaoData.status = appointmentData.status;
+      if (appointmentData.notes) agendaSessaoData.observacoes = appointmentData.notes;
 
-      toast({
-        title: 'Sucesso',
-        description: 'Consulta atualizada com sucesso!',
-      });
-
-      return true;
+      return await updateAgendaSessao(id, agendaSessaoData);
     } catch (error: any) {
       console.error('Erro ao atualizar consulta:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar a consulta.',
-        variant: 'destructive',
-      });
       return false;
     }
   };
 
   const deleteAppointment = async (id: string): Promise<boolean> => {
-    try {
-      setAppointments(prev => prev.filter(appointment => appointment.id !== id));
-
-      toast({
-        title: 'Sucesso',
-        description: 'Consulta removida com sucesso!',
-      });
-
-      return true;
-    } catch (error: any) {
-      console.error('Erro ao deletar consulta:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível remover a consulta.',
-        variant: 'destructive',
-      });
-      return false;
-    }
+    return await deleteAgendaSessao(id);
   };
 
   const getAppointmentById = (id: string): Appointment | undefined => {
@@ -273,24 +253,21 @@ export function useAppointments() {
   };
 
   const getAppointmentsByDate = (date: string): Appointment[] => {
-    return appointments.filter(appointment => appointment.date === date);
+    return getAgendaSessoesByDate(date).map(convertToAppointment);
   };
 
   const getAppointmentsByPatient = (patientId: string): Appointment[] => {
-    return appointments.filter(appointment => appointment.patient_id === patientId);
+    return getAgendaSessoesByPatient(patientId).map(convertToAppointment);
   };
 
   const getAppointmentsByStatus = (status: Appointment['status']): Appointment[] => {
-    return appointments.filter(appointment => appointment.status === status);
+    return agendaSessoes.filter(agendaSessao => agendaSessao.status === status).map(convertToAppointment);
   };
 
   const retry = () => {
-    fetchAppointments();
+    // Dados são recarregados automaticamente pelo hook useAgendaSessoesReal
+    return;
   };
-
-  useEffect(() => {
-    fetchAppointments();
-  }, []);
 
   return {
     appointments,

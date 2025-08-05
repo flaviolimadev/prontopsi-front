@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Users, CreditCard, TrendingUp, TrendingDown } from 'lucide-react';
 import { usePatients } from '@/hooks/usePatients';
 import { useAppointments } from '@/hooks/useAppointments';
-import { useFinancials } from '@/hooks/useFinancials';
+import { usePagamentos } from '@/hooks/usePagamentos';
 
 interface StatCardProps {
   title: string;
@@ -50,139 +50,106 @@ function StatCard({ title, value, description, icon: Icon, trend, trendDirection
 export function DashboardStats() {
   const { patients = [] } = usePatients();
   const { appointments = [] } = useAppointments();
-  const { financialRecords: financials = [] } = useFinancials();
+  const { pagamentos = [] } = usePagamentos();
+
+
 
   const stats = useMemo(() => {
+    // Usar APENAS dados reais do backend
+    
     const today = new Date().toISOString().split('T')[0];
     
     // Verificar se os dados existem antes de filtrar
-    if (!appointments || !patients || !financials) {
+    if (!appointments || !patients || !pagamentos) {
       return [
         {
           title: "Sessões Hoje",
           value: "0",
-          description: "Carregando dados...",
+          description: "Carregando...",
           icon: Calendar,
         },
         {
           title: "Pacientes Ativos",
           value: "0",
-          description: "Carregando dados...",
+          description: "Carregando...",
           icon: Users,
         },
         {
-          title: "Receita (30 dias)",
+          title: "Receita Mensal",
           value: "R$ 0,00",
-          description: "Carregando dados...",
+          description: "Carregando...",
           icon: CreditCard,
         },
         {
-          title: "Taxa de Comparecimento",
-          value: "--",
-          description: "Carregando dados...",
+          title: "Previsão 7 dias",
+          value: "R$ 0,00",
+          description: "Carregando...",
           icon: TrendingUp,
         },
       ];
     }
 
+    // 1. SESSÕES HOJE - Total de agendas para hoje
     const todayAppointments = appointments.filter(apt => apt.date === today);
-    const confirmedToday = todayAppointments.filter(apt => apt.status === "agendado").length;
-    const completedToday = todayAppointments.filter(apt => apt.status === "realizado").length;
+    
+    // 2. PACIENTES ATIVOS - Já correto
     const activePatients = patients.filter(p => p.status === "ativo").length;
     
-    // Métricas financeiras dos últimos 30 dias
+    // 3. RECEITA (30 dias) - Faturado dos últimos 30 dias (status 1 ou 2)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    const recent30DaysPayments = financials.filter(f => 
-      new Date(f.date) >= thirtyDaysAgo && f.status === "pago"
-    );
-    const totalRevenue30Days = recent30DaysPayments.reduce((total, f) => total + f.amount, 0);
-    
-    const pending30Days = financials.filter(f => 
-      new Date(f.date) >= thirtyDaysAgo && f.status === "pendente"
-    );
-    const pendingPayments30Days = pending30Days.reduce((total, f) => total + f.amount, 0);
-    
-    // Taxa de comparecimento dos últimos 30 dias vs. 30 dias anteriores
-    const sixtyDaysAgo = new Date();
-    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-    
-    // Consultas dos últimos 30 dias (finalizadas)
-    const recentAppointments = appointments.filter(apt => 
-      new Date(apt.date) >= thirtyDaysAgo && 
-      ['realizado', 'falta'].includes(apt.status)
-    );
-    
-    // Consultas dos 30 dias anteriores (30-60 dias atrás)
-    const previousAppointments = appointments.filter(apt => {
-      const aptDate = new Date(apt.date);
-      return aptDate >= sixtyDaysAgo && 
-             aptDate < thirtyDaysAgo && 
-             ['realizado', 'falta'].includes(apt.status);
+    const recent30DaysPayments = pagamentos.filter(p => {
+      const paymentDate = new Date(p.data);
+      return paymentDate >= thirtyDaysAgo && (p.status === 1 || p.status === 2); // Pago ou Confirmado
     });
+    const totalRevenue30Days = recent30DaysPayments.reduce((sum, p) => sum + Number(p.value || 0), 0);
     
-    const currentAttendanceRate = recentAppointments.length > 0 
-      ? Math.round((recentAppointments.filter(apt => apt.status === 'realizado').length / recentAppointments.length) * 100)
-      : 0;
-      
-    const previousAttendanceRate = previousAppointments.length > 0 
-      ? Math.round((previousAppointments.filter(apt => apt.status === 'realizado').length / previousAppointments.length) * 100)
-      : 0;
+    // 4. PREVISÃO SEMANAL - Total que vai receber na semana se pendentes forem pagos
+    const oneWeekFromNow = new Date();
+    oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
     
-    // Calcular trend real
-    let attendanceTrend: string | undefined;
-    let attendanceTrendDirection: "up" | "down" | undefined;
-    
-    if (recentAppointments.length >= 2 && previousAppointments.length >= 2) {
-      const trendDifference = currentAttendanceRate - previousAttendanceRate;
-      if (Math.abs(trendDifference) >= 5) { // Só mostrar se a diferença for significativa
-        attendanceTrend = `${trendDifference > 0 ? '+' : ''}${trendDifference}%`;
-        attendanceTrendDirection = trendDifference > 0 ? "up" : "down";
-      }
-    }
+    const weeklyPendingPayments = pagamentos.filter(p => {
+      const paymentDate = new Date(p.data);
+      return paymentDate <= oneWeekFromNow && p.status === 0; // Pendentes na próxima semana
+    });
+    const weeklyForecast = weeklyPendingPayments.reduce((sum, p) => sum + Number(p.value || 0), 0);
 
     return [
       {
         title: "Sessões Hoje",
         value: todayAppointments.length.toString(),
         description: todayAppointments.length === 0 
-          ? "Nenhuma sessão agendada" 
-          : `${confirmedToday} agendadas, ${completedToday} realizadas`,
+          ? "Nenhuma sessão" 
+          : `Agendadas para hoje`,
         icon: Calendar,
       },
       {
         title: "Pacientes Ativos",
         value: activePatients.toString(),
         description: activePatients === 0 
-          ? "Nenhum paciente cadastrado" 
+          ? "Nenhum paciente" 
           : `${patients.length - activePatients} inativos`,
         icon: Users,
       },
       {
-        title: "Receita (30 dias)",
+        title: "Receita Mensal",
         value: `R$ ${totalRevenue30Days.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        description: pendingPayments30Days > 0 
-          ? `R$ ${pendingPayments30Days.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} pendente nos últimos 30 dias`
-          : recent30DaysPayments.length > 0 
-          ? `${recent30DaysPayments.length} pagamentos recebidos`
-          : "Nenhum pagamento nos últimos 30 dias",
+        description: recent30DaysPayments.length === 0 
+          ? "Nenhum pagamento" 
+          : `${recent30DaysPayments.length} pagamentos`,
         icon: CreditCard,
       },
       {
-        title: "Taxa de Comparecimento",
-        value: recentAppointments.length === 0 ? "--" : `${currentAttendanceRate}%`,
-        description: recentAppointments.length === 0 
-          ? "Nenhuma consulta finalizada nos últimos 30 dias" 
-          : recentAppointments.length < 2
-          ? "Dados insuficientes para cálculo confiável"
-          : `Baseado em ${recentAppointments.length} consultas dos últimos 30 dias`,
+        title: "Previsão 7 dias",
+        value: `R$ ${weeklyForecast.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        description: weeklyPendingPayments.length === 0 
+          ? "Nenhum pendente" 
+          : `${weeklyPendingPayments.length} pendentes`,
         icon: TrendingUp,
-        trend: attendanceTrend,
-        trendDirection: attendanceTrendDirection,
       },
     ];
-  }, [patients, appointments, financials]);
+  }, [patients, appointments, pagamentos]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

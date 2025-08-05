@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { DollarSign, Plus, TrendingUp, Calendar, Download, User, CreditCard, CalendarIcon, Package, Edit, Trash2, Power, PowerOff } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, Calendar, Download, User, CreditCard, CalendarIcon, Package, Edit, Trash2, Power, PowerOff, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { usePatients } from "@/hooks/usePatients";
-import { usePacotes } from "@/hooks/usePacotes";
+import { usePacotes } from "../hooks/usePacotes";
 import { usePagamentos } from "@/hooks/usePagamentos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,19 +29,63 @@ export default function Financeiro() {
   const [startDate, setStartDate] = useState<Date | undefined>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const { toast } = useToast();
+
+  // Função para formatar data sem problemas de timezone
+  const formatDateToYYYYMMDD = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
   
   // Estados para o combobox de pacientes
   const [patientComboOpen, setPatientComboOpen] = useState(false);
   const [selectedPatientName, setSelectedPatientName] = useState("");
   
-  // Para demonstração, inicializando com dados vazios
-  const mockPayments: any[] = [];
-  const monthlyStats = {
-    totalReceived: 0,
-    totalPending: 0,
-    sessionsThisMonth: 0,
-    averageValue: 0
+  // Calcular estatísticas baseadas nos dados reais
+  const calculateStats = () => {
+    if (!pagamentos || pagamentos.length === 0) {
+      return {
+        totalReceived: 0,
+        totalPending: 0,
+        sessionsThisMonth: 0,
+        averageValue: 0
+      };
+    }
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // Filtrar pagamentos do mês atual
+    const currentMonthPayments = pagamentos.filter(pagamento => {
+      const paymentDate = new Date(pagamento.data);
+      return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
+    });
+
+    // Calcular totais
+    const totalReceived = currentMonthPayments
+      .filter(p => p.status === 1 || p.status === 2) // Pago ou Confirmado
+      .reduce((sum, p) => sum + Number(p.value || 0), 0);
+
+    const totalPending = currentMonthPayments
+      .filter(p => p.status === 0) // Pendente
+      .reduce((sum, p) => sum + Number(p.value || 0), 0);
+
+    const sessionsThisMonth = currentMonthPayments.length;
+
+    const averageValue = sessionsThisMonth > 0 ? 
+      currentMonthPayments.reduce((sum, p) => sum + Number(p.value || 0), 0) / sessionsThisMonth : 0;
+
+    return {
+      totalReceived,
+      totalPending,
+      sessionsThisMonth,
+      averageValue
+    };
   };
+
+  const monthlyStats = calculateStats();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isEditPaymentModalOpen, setIsEditPaymentModalOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
@@ -58,14 +102,16 @@ export default function Financeiro() {
   });
 
   // Estados para pagamentos
-  const [isPagamentoModalOpen, setIsPagamentoModalOpen] = useState(false);
   const [isEditPagamentoModalOpen, setIsEditPagamentoModalOpen] = useState(false);
   const [selectedPagamento, setSelectedPagamento] = useState<any>(null);
+  
+  // Estado para controlar expansão do gráfico
+  const [isGraphExpanded, setIsGraphExpanded] = useState(false);
   const [pagamentoForm, setPagamentoForm] = useState({
     pacienteId: '',
     pacoteId: '',
-    data: new Date().toISOString().split('T')[0],
-    vencimento: new Date().toISOString().split('T')[0],
+    data: formatDateToYYYYMMDD(new Date()),
+    vencimento: formatDateToYYYYMMDD(new Date()),
     value: '',
     descricao: '',
     type: null,
@@ -77,21 +123,25 @@ export default function Financeiro() {
     value: "",
     method: "",
     session: "",
-    date: new Date().toISOString().split('T')[0]
+    date: formatDateToYYYYMMDD(new Date())
   });
 
   const [quickPaymentForm, setQuickPaymentForm] = useState({
     patient: "",
     value: "",
     method: "",
-    date: new Date().toISOString().split('T')[0]
+    date: formatDateToYYYYMMDD(new Date())
   });
 
-  // Carregar pacotes e pagamentos ao montar o componente
+  // Carregar pagamentos ao montar o componente (pacotes são carregados automaticamente pelo hook)
   useEffect(() => {
-    fetchPacotes();
     fetchPagamentos();
-  }, [fetchPacotes, fetchPagamentos]);
+  }, [fetchPagamentos]);
+
+  // Função para recarregar pacotes manualmente
+  const handleReloadPacotes = () => {
+    fetchPacotes();
+  };
 
   const handleExportCSV = () => {
     toast({
@@ -115,10 +165,10 @@ export default function Financeiro() {
       description: `Pagamento de R$ ${newPaymentForm.value} registrado para ${newPaymentForm.patient}.`
     });
     setIsPaymentModalOpen(false);
-    setNewPaymentForm({ patient: "", value: "", method: "", session: "", date: new Date().toISOString().split('T')[0] });
+    setNewPaymentForm({ patient: "", value: "", method: "", session: "", date: formatDateToYYYYMMDD(new Date()) });
   };
 
-  const handleQuickPayment = () => {
+  const handleQuickPayment = async () => {
     if (!quickPaymentForm.patient || !quickPaymentForm.value || !quickPaymentForm.method) {
       toast({
         title: "Erro",
@@ -128,11 +178,46 @@ export default function Financeiro() {
       return;
     }
 
-    toast({
-      title: "Pagamento registrado!",
-      description: `Pagamento rápido de R$ ${quickPaymentForm.value} registrado.`
-    });
-    setQuickPaymentForm({ patient: "", value: "", method: "", date: new Date().toISOString().split('T')[0] });
+    // Encontrar o paciente pelo nome
+    const selectedPatient = patients.find(p => p.name === quickPaymentForm.patient);
+    if (!selectedPatient) {
+      toast({
+        title: "Erro",
+        description: "Paciente não encontrado.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Converter método para o formato numérico
+      const typeMapping: { [key: string]: number } = {
+        'PIX': 1,
+        'Cartão': 2,
+        'Boleto': 3,
+        'Dinheiro': 4
+      };
+
+      await createPagamento({
+        pacienteId: selectedPatient.id,
+        pacoteId: null,
+        data: quickPaymentForm.date,
+        vencimento: quickPaymentForm.date,
+        value: Number(quickPaymentForm.value.replace(/\D/g, '')) / 100,
+        descricao: `Pagamento rápido via ${quickPaymentForm.method}`,
+        type: typeMapping[quickPaymentForm.method] || null,
+        txid: undefined
+      });
+
+      toast({
+        title: "Pagamento registrado!",
+        description: `Pagamento rápido de R$ ${quickPaymentForm.value} registrado para ${quickPaymentForm.patient}.`
+      });
+      
+      setQuickPaymentForm({ patient: "", value: "", method: "", date: formatDateToYYYYMMDD(new Date()) });
+    } catch (error) {
+      // Erro já tratado no hook
+    }
   };
 
   const handleMarkAsPaid = (payment: any) => {
@@ -169,7 +254,7 @@ export default function Financeiro() {
       description: `Dados do pagamento de ${newPaymentForm.patient} foram atualizados.`
     });
     setIsEditPaymentModalOpen(false);
-    setNewPaymentForm({ patient: "", value: "", method: "", session: "", date: new Date().toISOString().split('T')[0] });
+    setNewPaymentForm({ patient: "", value: "", method: "", session: "", date: formatDateToYYYYMMDD(new Date()) });
     setSelectedPayment(null);
   };
 
@@ -324,12 +409,12 @@ export default function Financeiro() {
         txid: pagamentoForm.txid || undefined
       });
 
-      setIsPagamentoModalOpen(false);
+      setIsPaymentModalOpen(false);
       setPagamentoForm({
         pacienteId: '',
         pacoteId: '',
-        data: new Date().toISOString().split('T')[0],
-        vencimento: new Date().toISOString().split('T')[0],
+        data: formatDateToYYYYMMDD(new Date()),
+        vencimento: formatDateToYYYYMMDD(new Date()),
         value: '',
         descricao: '',
         type: null,
@@ -345,8 +430,8 @@ export default function Financeiro() {
     setPagamentoForm({
       pacienteId: pagamento.pacienteId,
       pacoteId: pagamento.pacoteId || '',
-      data: pagamento.data,
-      vencimento: pagamento.vencimento,
+      data: pagamento.data ? new Date(pagamento.data + 'T00:00:00').toISOString().split('T')[0] : formatDateToYYYYMMDD(new Date()),
+      vencimento: pagamento.vencimento ? new Date(pagamento.vencimento + 'T00:00:00').toISOString().split('T')[0] : formatDateToYYYYMMDD(new Date()),
       value: new Intl.NumberFormat('pt-BR', {
         style: 'currency',
         currency: 'BRL',
@@ -386,8 +471,8 @@ export default function Financeiro() {
       setPagamentoForm({
         pacienteId: '',
         pacoteId: '',
-        data: new Date().toISOString().split('T')[0],
-        vencimento: new Date().toISOString().split('T')[0],
+        data: formatDateToYYYYMMDD(new Date()),
+        vencimento: formatDateToYYYYMMDD(new Date()),
         value: '',
         descricao: '',
         type: null,
@@ -740,6 +825,436 @@ export default function Financeiro() {
         </CardContent>
       </Card>
 
+      {/* Resumo Gráfico Animado */}
+      <Card className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 border-gray-200 dark:border-gray-800">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
+                <TrendingUp className="h-6 w-6" />
+                Resumo Visual - Período Selecionado
+              </CardTitle>
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                Análise gráfica dos seus dados financeiros
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsGraphExpanded(!isGraphExpanded)}
+              className="gap-2"
+            >
+              {isGraphExpanded ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Recolher
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Expandir
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        {isGraphExpanded && (
+          <CardContent className="space-y-6">
+            {/* Gráfico de Barras Animado - Status dos Pagamentos */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Status dos Pagamentos</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Pendentes */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Pendentes</span>
+                  <span className="text-lg font-bold text-yellow-800 dark:text-yellow-200">
+                    {pagamentos.filter(p => p.status === 0).length}
+                  </span>
+                </div>
+                <div className="w-full bg-yellow-100 dark:bg-yellow-900 rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000 ease-out animate-pulse"
+                    style={{
+                      width: `${pagamentos.length > 0 ? (pagamentos.filter(p => p.status === 0).length / pagamentos.length) * 100 : 0}%`,
+                      animationDelay: '0.1s'
+                    }}
+                  ></div>
+                </div>
+                <div className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+                  R$ {pagamentos.filter(p => p.status === 0).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </div>
+              </div>
+
+              {/* Pagos (inclui status 1 e 2) */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-green-200 dark:border-green-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-green-700 dark:text-green-300">Pagos</span>
+                  <span className="text-lg font-bold text-green-800 dark:text-green-200">
+                    {pagamentos.filter(p => p.status === 1 || p.status === 2).length}
+                  </span>
+                </div>
+                <div className="w-full bg-green-100 dark:bg-green-900 rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
+                    style={{
+                      width: `${pagamentos.length > 0 ? (pagamentos.filter(p => p.status === 1 || p.status === 2).length / pagamentos.length) * 100 : 0}%`,
+                      animationDelay: '0.2s'
+                    }}
+                  ></div>
+                </div>
+                <div className="mt-2 text-xs text-green-600 dark:text-green-400">
+                  R$ {pagamentos.filter(p => p.status === 1 || p.status === 2).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </div>
+              </div>
+
+              {/* Cancelados */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-red-200 dark:border-red-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-red-700 dark:text-red-300">Cancelados</span>
+                  <span className="text-lg font-bold text-red-800 dark:text-red-200">
+                    {pagamentos.filter(p => p.status === 3).length}
+                  </span>
+                </div>
+                <div className="w-full bg-red-100 dark:bg-red-900 rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-red-400 to-red-600 rounded-full transition-all duration-1000 ease-out"
+                    style={{
+                      width: `${pagamentos.length > 0 ? (pagamentos.filter(p => p.status === 3).length / pagamentos.length) * 100 : 0}%`,
+                      animationDelay: '0.3s'
+                    }}
+                  ></div>
+                </div>
+                <div className="mt-2 text-xs text-red-600 dark:text-red-400">
+                  R$ {pagamentos.filter(p => p.status === 3).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+            {/* Gráfico Circular Animado - Tipos de Pagamento */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Tipos de Pagamento</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Gráfico Circular com CSS */}
+              <div className="flex items-center justify-center">
+                <div className="relative w-48 h-48">
+                  {/* Background circle */}
+                  <div className="absolute inset-0 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                  
+                  {/* Animated segments */}
+                  {(() => {
+                    // Filtrar apenas pagamentos pagos/confirmados para o gráfico de tipos
+                    const paidPayments = pagamentos.filter(p => p.status === 1 || p.status === 2);
+                    const totalPayments = paidPayments.length;
+                    const pixCount = paidPayments.filter(p => p.type === 1).length;
+                    const cardCount = paidPayments.filter(p => p.type === 2).length;
+                    const boletoCount = paidPayments.filter(p => p.type === 3).length;
+                    const dinheiroCount = paidPayments.filter(p => p.type === 4).length;
+                    
+                    const pixPercent = totalPayments > 0 ? (pixCount / totalPayments) * 100 : 0;
+                    const cardPercent = totalPayments > 0 ? (cardCount / totalPayments) * 100 : 0;
+                    const boletoPercent = totalPayments > 0 ? (boletoCount / totalPayments) * 100 : 0;
+                    const dinheiroPercent = totalPayments > 0 ? (dinheiroCount / totalPayments) * 100 : 0;
+                    
+                    return (
+                      <>
+                        {/* PIX */}
+                        <div 
+                          className="absolute inset-0 rounded-full transition-all duration-1000 ease-out"
+                          style={{
+                            background: `conic-gradient(from 0deg, #10b981 0%, #10b981 ${pixPercent}%, transparent ${pixPercent}%, transparent 100%)`,
+                            transform: 'rotate(-90deg)',
+                            animationDelay: '0.5s'
+                          }}
+                        ></div>
+                        
+                        {/* Cartão */}
+                        <div 
+                          className="absolute inset-0 rounded-full transition-all duration-1000 ease-out"
+                          style={{
+                            background: `conic-gradient(from ${pixPercent * 3.6}deg, #3b82f6 0%, #3b82f6 ${cardPercent}%, transparent ${cardPercent}%, transparent 100%)`,
+                            transform: 'rotate(-90deg)',
+                            animationDelay: '0.7s'
+                          }}
+                        ></div>
+                        
+                        {/* Boleto */}
+                        <div 
+                          className="absolute inset-0 rounded-full transition-all duration-1000 ease-out"
+                          style={{
+                            background: `conic-gradient(from ${(pixPercent + cardPercent) * 3.6}deg, #f59e0b 0%, #f59e0b ${boletoPercent}%, transparent ${boletoPercent}%, transparent 100%)`,
+                            transform: 'rotate(-90deg)',
+                            animationDelay: '0.9s'
+                          }}
+                        ></div>
+                        
+                        {/* Dinheiro */}
+                        <div 
+                          className="absolute inset-0 rounded-full transition-all duration-1000 ease-out"
+                          style={{
+                            background: `conic-gradient(from ${(pixPercent + cardPercent + boletoPercent) * 3.6}deg, #8b5cf6 0%, #8b5cf6 ${dinheiroPercent}%, transparent ${dinheiroPercent}%, transparent 100%)`,
+                            transform: 'rotate(-90deg)',
+                            animationDelay: '1.1s'
+                          }}
+                        ></div>
+                        
+                        {/* Center circle */}
+                        <div className="absolute inset-8 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-gray-900 dark:text-white">{totalPayments}</div>
+                            <div className="text-xs text-gray-700 dark:text-white">Pagos</div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+              
+              {/* Legenda */}
+              <div className="space-y-3">
+                {(() => {
+                  // Filtrar apenas pagamentos pagos/confirmados para a legenda
+                  const paidPayments = pagamentos.filter(p => p.status === 1 || p.status === 2);
+                  
+                  return (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+                        <div className="flex-1">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-700 dark:text-white">PIX</span>
+                            <span className="text-sm font-bold text-green-600 dark:text-white">{paidPayments.filter(p => p.type === 1).length}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-white">
+                            R$ {paidPayments.filter(p => p.type === 1).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                        <div className="flex-1">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-700 dark:text-white">Cartão</span>
+                            <span className="text-sm font-bold text-blue-600 dark:text-white">{paidPayments.filter(p => p.type === 2).length}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-white">
+                            R$ {paidPayments.filter(p => p.type === 2).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 bg-yellow-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                        <div className="flex-1">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-700 dark:text-white">Boleto</span>
+                            <span className="text-sm font-bold text-yellow-600 dark:text-white">{paidPayments.filter(p => p.type === 3).length}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-white">
+                            R$ {paidPayments.filter(p => p.type === 3).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
+                        <div className="flex-1">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-700 dark:text-white">Dinheiro</span>
+                            <span className="text-sm font-bold text-purple-600 dark:text-white">{paidPayments.filter(p => p.type === 4).length}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-white">
+                            R$ {paidPayments.filter(p => p.type === 4).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+
+            {/* Evolução Temporal Animada - Gráfico de Linha */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Evolução dos Pagamentos</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+              {(() => {
+                // Agrupar pagamentos por semana dos últimos 4 semanas
+                const weeks = [];
+                
+                for (let i = 3; i >= 0; i--) {
+                  const weekStart = new Date();
+                  weekStart.setDate(weekStart.getDate() - (i + 1) * 7);
+                  const weekEnd = new Date();
+                  weekEnd.setDate(weekEnd.getDate() - i * 7);
+                  
+                  const weekPayments = pagamentos.filter(p => {
+                    const paymentDate = new Date(p.data);
+                    return paymentDate >= weekStart && paymentDate < weekEnd;
+                  });
+                  
+                  weeks.push({
+                    label: `S${4-i}`,
+                    value: weekPayments.reduce((sum, p) => sum + Number(p.value || 0), 0),
+                    count: weekPayments.length,
+                    date: `${weekStart.getDate()}/${weekStart.getMonth() + 1}`
+                  });
+                }
+                
+                const maxValue = Math.max(...weeks.map(w => w.value), 100);
+                const minValue = Math.min(...weeks.map(w => w.value), 0);
+                const range = maxValue - minValue || 1;
+                
+                // Calcular pontos da linha
+                const points = weeks.map((week, index) => {
+                  const x = (index / (weeks.length - 1)) * 100;
+                  const y = 100 - ((week.value - minValue) / range) * 100;
+                  return `${x},${y}`;
+                }).join(' ');
+                
+                // Calcular pontos para a área sob a linha
+                const areaPoints = `0,100 ${points} 100,100`;
+                
+                return (
+                  <div className="relative">
+                    {/* Área do gráfico */}
+                    <div className="h-40 relative">
+                      {/* Grid de fundo */}
+                      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        {/* Linhas horizontais do grid */}
+                        {[0, 25, 50, 75, 100].map(y => (
+                          <line
+                            key={y}
+                            x1="0" y1={y} x2="100" y2={y}
+                            stroke="currentColor"
+                            strokeWidth="0.2"
+                            className="text-gray-300 dark:text-gray-600"
+                          />
+                        ))}
+                        {/* Linhas verticais do grid */}
+                        {weeks.map((_, index) => {
+                          const x = (index / (weeks.length - 1)) * 100;
+                          return (
+                            <line
+                              key={index}
+                              x1={x} y1="0" x2={x} y2="100"
+                              stroke="currentColor"
+                              strokeWidth="0.2"
+                              className="text-gray-300 dark:text-gray-600"
+                            />
+                          );
+                        })}
+                      </svg>
+                      
+                      {/* Área sob a linha (gradiente) */}
+                      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
+                            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
+                          </linearGradient>
+                        </defs>
+                        <polygon
+                          points={areaPoints}
+                          fill="url(#areaGradient)"
+                          className="transition-all duration-1000 ease-out"
+                          style={{ animationDelay: '0.5s' }}
+                        />
+                      </svg>
+                      
+                      {/* Linha principal */}
+                      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <polyline
+                          points={points}
+                          fill="none"
+                          stroke="#3b82f6"
+                          strokeWidth="0.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="drop-shadow-sm transition-all duration-1000 ease-out"
+                          style={{
+                            strokeDasharray: '200',
+                            strokeDashoffset: '200',
+                            animation: 'drawLine 1.5s ease-out 0.3s forwards'
+                          }}
+                        />
+                      </svg>
+                      
+                      {/* Pontos da linha */}
+                      {weeks.map((week, index) => {
+                        const x = (index / (weeks.length - 1)) * 100;
+                        const y = 100 - ((week.value - minValue) / range) * 100;
+                        return (
+                          <div
+                            key={index}
+                            className="absolute w-3 h-3 bg-blue-500 border-2 border-white dark:border-gray-800 rounded-full shadow-lg transition-all duration-300 hover:scale-125 hover:bg-blue-600 cursor-pointer group"
+                            style={{
+                              left: `${x}%`,
+                              top: `${y}%`,
+                              transform: 'translate(-50%, -50%)',
+                              animationDelay: `${0.8 + index * 0.1}s`,
+                              opacity: 0,
+                              animation: 'fadeInPoint 0.5s ease-out forwards'
+                            }}
+                            title={`Semana ${index + 1}: R$ ${week.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (${week.count} pagamentos)`}
+                          >
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                              {week.label}: R$ {week.value.toLocaleString('pt-BR')}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Labels do eixo X */}
+                    <div className="flex justify-between mt-4 px-2">
+                      {weeks.map((week, index) => (
+                        <div key={index} className="text-center">
+                          <div className="text-xs font-medium text-gray-700 dark:text-white">{week.label}</div>
+                          <div className="text-xs text-gray-500 dark:text-white">{week.date}</div>
+                          <div className="text-xs text-blue-600 dark:text-white font-semibold">
+                            {week.count} pag.
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Legenda de valores */}
+                    <div className="flex justify-between items-center mt-4 text-xs text-gray-500 dark:text-white">
+                      <span>Min: R$ {minValue.toLocaleString('pt-BR')}</span>
+                      <span className="text-center">Últimas 4 semanas</span>
+                      <span>Max: R$ {maxValue.toLocaleString('pt-BR')}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+          
+          {/* CSS Animations para o gráfico de linha */}
+          <style jsx>{`
+            @keyframes drawLine {
+              to {
+                stroke-dashoffset: 0;
+              }
+            }
+            
+            @keyframes fadeInPoint {
+              to {
+                opacity: 1;
+              }
+            }
+          `}</style>
+          </CardContent>
+        )}
+      </Card>
+
       {/* Financial Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -812,69 +1327,25 @@ export default function Financeiro() {
                 Gerencie seus pacotes de serviços
               </p>
             </div>
-            <Dialog open={isPacoteModalOpen} onOpenChange={setIsPacoteModalOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Novo Pacote
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Novo Pacote</DialogTitle>
-                  <DialogDescription>Adicione um novo pacote de serviços</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Título do Pacote *</Label>
-                    <Input
-                      placeholder="Ex: Pacote Mensal - 4 Sessões"
-                      value={pacoteForm.title}
-                      onChange={(e) => setPacoteForm({...pacoteForm, title: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Valor *</Label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="0,00"
-                        value={pacoteForm.value}
-                        onChange={(e) => handlePacoteValueChange(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Descrição</Label>
-                    <Textarea
-                      placeholder="Descreva o que está incluído no pacote..."
-                      value={pacoteForm.descricao}
-                      onChange={(e) => setPacoteForm({...pacoteForm, descricao: e.target.value})}
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="ativo"
-                      checked={pacoteForm.ativo}
-                      onChange={(e) => setPacoteForm({...pacoteForm, ativo: e.target.checked})}
-                      className="rounded border-gray-300"
-                    />
-                    <Label htmlFor="ativo" className="text-sm">Pacote ativo</Label>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setIsPacoteModalOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button onClick={handleCreatePacote}>
-                      Criar Pacote
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={handleReloadPacotes} disabled={pacotesLoading}>
+                {pacotesLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                    Carregando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Recarregar
+                  </>
+                )}
+              </Button>
+              <Button className="gap-2" onClick={() => setIsPacoteModalOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Novo Pacote
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -883,24 +1354,20 @@ export default function Financeiro() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
               <p className="text-muted-foreground mt-2">Carregando pacotes...</p>
             </div>
-          ) : pacotes.length === 0 ? (
+          ) : pacotes?.length === 0 ? (
             <div className="text-center py-8">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">
                 Nenhum pacote criado ainda
               </p>
-              <Dialog open={isPacoteModalOpen} onOpenChange={setIsPacoteModalOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="mt-4 gap-2">
-                    <Plus className="h-4 w-4" />
-                    Criar Primeiro Pacote
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
+              <Button variant="outline" className="mt-4 gap-2" onClick={() => setIsPacoteModalOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Criar Primeiro Pacote
+              </Button>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {pacotes.map((pacote) => (
+              {pacotes?.map((pacote) => (
                 <Card key={pacote.id} className="relative">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
@@ -972,6 +1439,65 @@ export default function Financeiro() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Criação de Pacote */}
+      <Dialog open={isPacoteModalOpen} onOpenChange={setIsPacoteModalOpen}>
+                <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Criar Novo Pacote</DialogTitle>
+                  <DialogDescription>Adicione um novo pacote de serviços</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Título do Pacote *</Label>
+                    <Input
+                      placeholder="Ex: Pacote Mensal - 4 Sessões"
+                      value={pacoteForm.title}
+                      onChange={(e) => setPacoteForm({...pacoteForm, title: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Valor *</Label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="0,00"
+                        value={pacoteForm.value}
+                        onChange={(e) => handlePacoteValueChange(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descrição</Label>
+                    <Textarea
+                      placeholder="Descreva o que está incluído no pacote..."
+                      value={pacoteForm.descricao}
+                      onChange={(e) => setPacoteForm({...pacoteForm, descricao: e.target.value})}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="ativo"
+                      checked={pacoteForm.ativo}
+                      onChange={(e) => setPacoteForm({...pacoteForm, ativo: e.target.checked})}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="ativo" className="text-sm">Pacote ativo</Label>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setIsPacoteModalOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleCreatePacote}>
+                      Criar Pacote
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
 
       {/* Modal de Edição de Pacote */}
       <Dialog open={isEditPacoteModalOpen} onOpenChange={setIsEditPacoteModalOpen}>
@@ -1045,7 +1571,7 @@ export default function Financeiro() {
                 Gerencie todos os pagamentos dos seus pacientes
               </p>
             </div>
-            <Dialog open={isPagamentoModalOpen} onOpenChange={setIsPagamentoModalOpen}>
+            <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Plus className="h-4 w-4" />
@@ -1077,7 +1603,7 @@ export default function Financeiro() {
                     <Label>Pacote (Opcional)</Label>
                     <Select value={pagamentoForm.pacoteId || 'nenhum'} onValueChange={(value) => {
                       const newPacoteId = value === 'nenhum' ? null : value;
-                      const selectedPacote = value !== 'nenhum' ? pacotes.find(p => p.id === value) : null;
+                      const selectedPacote = value !== 'nenhum' ? pacotes?.find(p => p.id === value) : null;
                       setPagamentoForm({
                         ...pagamentoForm, 
                         pacoteId: newPacoteId,
@@ -1089,7 +1615,7 @@ export default function Financeiro() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="nenhum">Nenhum pacote</SelectItem>
-                        {pacotes.filter(pacote => pacote.ativo).map((pacote) => (
+                        {pacotes?.filter(pacote => pacote.ativo).map((pacote) => (
                           <SelectItem key={pacote.id} value={pacote.id}>
                             {pacote.title} - R$ {Number(pacote.value || 0).toFixed(2)}
                           </SelectItem>
@@ -1167,7 +1693,7 @@ export default function Financeiro() {
                     </div>
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setIsPagamentoModalOpen(false)}>
+                    <Button variant="outline" onClick={() => setIsPaymentModalOpen(false)}>
                       Cancelar
                     </Button>
                     <Button onClick={handleCreatePagamento}>
@@ -1191,14 +1717,10 @@ export default function Financeiro() {
               <p className="text-muted-foreground">
                 Nenhum pagamento registrado ainda
               </p>
-              <Dialog open={isPagamentoModalOpen} onOpenChange={setIsPagamentoModalOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="mt-4 gap-2">
-                    <Plus className="h-4 w-4" />
-                    Criar Primeiro Pagamento
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
+              <Button variant="outline" className="mt-4 gap-2" onClick={() => setIsPaymentModalOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Criar Primeiro Pagamento
+              </Button>
             </div>
           ) : (
             <Table>
@@ -1309,7 +1831,7 @@ export default function Financeiro() {
               <Label>Pacote (Opcional)</Label>
               <Select value={pagamentoForm.pacoteId || 'nenhum'} onValueChange={(value) => {
                 const newPacoteId = value === 'nenhum' ? null : value;
-                const selectedPacote = value !== 'nenhum' ? pacotes.find(p => p.id === value) : null;
+                const selectedPacote = value !== 'nenhum' ? pacotes?.find(p => p.id === value) : null;
                 setPagamentoForm({
                   ...pagamentoForm, 
                   pacoteId: newPacoteId,
@@ -1321,7 +1843,7 @@ export default function Financeiro() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="nenhum">Nenhum pacote</SelectItem>
-                  {pacotes.filter(pacote => pacote.ativo).map((pacote) => (
+                  {pacotes?.filter(pacote => pacote.ativo).map((pacote) => (
                     <SelectItem key={pacote.id} value={pacote.id}>
                       {pacote.title} - R$ {Number(pacote.value || 0).toFixed(2)}
                     </SelectItem>
@@ -1571,89 +2093,7 @@ export default function Financeiro() {
         </CardContent>
       </Card>
 
-      {/* Payments Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Pagamentos do Mês</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {mockPayments.length === 0 ? (
-            <div className="text-center py-8">
-              <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                Nenhum pagamento registrado ainda
-              </p>
-              <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="mt-4 gap-2">
-                    <Plus className="h-4 w-4" />
-                    Registrar Primeiro Pagamento
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Paciente</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Sessão</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Método</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockPayments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        {payment.patient}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(payment.date).toLocaleDateString('pt-BR')}
-                    </TableCell>
-                    <TableCell>Sessão {payment.session}</TableCell>
-                    <TableCell className="font-medium">
-                      R$ {payment.value.toLocaleString('pt-BR')}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="gap-1">
-                        <CreditCard className="h-3 w-3" />
-                        {payment.method}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={payment.status === "pago" ? "default" : "secondary"}
-                        className="capitalize"
-                      >
-                        {payment.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {payment.status === "pendente" && (
-                          <Button size="sm" variant="outline" onClick={() => handleMarkAsPaid(payment)}>
-                            Marcar como Pago
-                          </Button>
-                        )}
-                        <Button size="sm" variant="ghost" onClick={() => handleEditPayment(payment)}>
-                          Editar
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+
     </div>
   );
 }

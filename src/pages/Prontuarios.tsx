@@ -1,6 +1,9 @@
-import { useState } from "react";
-import { FileText, Plus, Lock, Calendar, User, Search, Paperclip } from "lucide-react";
+import { useState, useEffect } from "react";
+import { FileText, Plus, Lock, Calendar, User, Search, Paperclip, Edit, Save, Download, Upload, Trash2, Clock } from "lucide-react";
 import { usePatients } from "@/hooks/usePatients";
+import { useAgendaSessoes } from "@/hooks/useAgendaSessoes";
+import { useProntuarios, ProntuarioUpdateData } from "@/hooks/useProntuarios";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,388 +13,700 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Dados serão carregados do contexto global
+interface ProntuarioEntry {
+  id: string;
+  date: string;
+  type: 'avaliacao' | 'evolucao' | 'encaminhamento';
+  content: string;
+  psychologist: string;
+}
+
+interface Anexo {
+  id: string;
+  name: string;
+  type: string;
+  size: string;
+  uploadDate: string;
+}
 
 export default function Prontuarios() {
+  const { patientId } = useParams();
+  const navigate = useNavigate();
   const { patients } = usePatients();
-  const [selectedPatient, setSelectedPatient] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   
-  // Para demonstração, inicializando com array vazio - prontuários serão implementados posteriormente
-  const mockEntries: any[] = [];
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [isNewEntryModalOpen, setIsNewEntryModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState<any>(null);
+  const [isAnexoModalOpen, setIsAnexoModalOpen] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  
+  // Dados do prontuário
+  const [prontuarioData, setProntuarioData] = useState({
+    avaliacaoDemanda: "",
+    evolucao: [] as ProntuarioEntry[],
+    encaminhamento: "",
+    anexos: [] as Anexo[]
+  });
+
+  // Hooks para integração com backend
+  const { getProntuario, saveProntuario, addEvolucao, deleteEvolucao, addAnexo, deleteAnexo, loading } = useProntuarios();
+  const { agendaSessoes } = useAgendaSessoes();
 
   const [newEntryForm, setNewEntryForm] = useState({
-    patient: "",
-    sessionType: "",
+    type: 'evolucao' as 'avaliacao' | 'evolucao' | 'encaminhamento',
     content: "",
-    diagnosis: ""
+    date: new Date().toISOString().split('T')[0]
   });
 
-  const [quickEntryForm, setQuickEntryForm] = useState({
-    patient: "",
-    sessionType: "",
-    content: ""
-  });
+  // Reset quando patientId mudar
+  useEffect(() => {
+    if (patientId) {
+      setIsDataLoaded(false);
+      setSelectedPatient(null);
+    }
+  }, [patientId]);
 
-  const filteredEntries = mockEntries.filter(entry => {
-    const matchesPatient = selectedPatient === "" || selectedPatient === "todos" || entry.patient === selectedPatient;
-    const matchesSearch = entry.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         entry.patient.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesPatient && matchesSearch;
-  });
+  // Carregar dados do paciente
+  useEffect(() => {
+    console.log('useEffect - patientId:', patientId);
+    console.log('useEffect - patients.length:', patients.length);
+    console.log('useEffect - isDataLoaded:', isDataLoaded);
+    
+    if (patientId && patients.length > 0 && !isDataLoaded) {
+      const patient = patients.find(p => p.id === patientId);
+      console.log('Paciente encontrado:', patient);
+      
+      if (patient) {
+        setSelectedPatient(patient);
+        // Aqui você carregaria os dados do prontuário do backend
+        loadProntuarioData(patientId);
+        setIsDataLoaded(true);
+      } else {
+        console.log('Paciente não encontrado, redirecionando...');
+        navigate("/pacientes");
+      }
+    }
+  }, [patientId, patients.length, isDataLoaded]);
 
-  const handleCreateEntry = () => {
-    if (!newEntryForm.patient || !newEntryForm.content) {
+  const loadProntuarioData = async (patientId: string) => {
+    console.log('Carregando dados do prontuário para paciente:', patientId);
+    try {
+      const prontuario = await getProntuario(patientId);
+      console.log('Dados do prontuário carregados:', prontuario);
+      if (prontuario) {
+        // Garantir que evolucao e anexos sejam sempre arrays
+        const prontuarioNormalizado = {
+          ...prontuario,
+          evolucao: prontuario.evolucao || [],
+          anexos: prontuario.anexos || [],
+          avaliacaoDemanda: prontuario.avaliacaoDemanda || "",
+          encaminhamento: prontuario.encaminhamento || ""
+        };
+        console.log('Prontuário normalizado:', prontuarioNormalizado);
+        setProntuarioData(prontuarioNormalizado);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar prontuário:', error);
+    }
+  };
+
+  const handleSaveProntuario = async () => {
+    console.log('Salvando prontuário - patientId:', patientId);
+    console.log('Dados do prontuário:', prontuarioData);
+    
+    if (!patientId) {
+      console.error('patientId não encontrado');
       toast({
         title: "Erro",
-        description: "Paciente e conteúdo são obrigatórios.",
+        description: "ID do paciente não encontrado.",
         variant: "destructive"
       });
       return;
     }
 
-    toast({
-      title: "Entrada criada!",
-      description: `Nova entrada de prontuário para ${newEntryForm.patient}.`
-    });
-    setIsNewEntryModalOpen(false);
-    setNewEntryForm({ patient: "", sessionType: "", content: "", diagnosis: "" });
+    // Enviar apenas os campos editáveis, sem sobrescrever evoluções e anexos
+    const dataToSave: ProntuarioUpdateData = {
+      pacienteId: patientId,
+      avaliacaoDemanda: prontuarioData.avaliacaoDemanda,
+      encaminhamento: prontuarioData.encaminhamento
+      // NÃO incluir evolucao e anexos para não sobrescrever
+    };
+    
+    console.log('Dados que serão salvos (sem evoluções/anexos):', dataToSave);
+    
+    const success = await saveProntuario(dataToSave);
+    
+    if (success) {
+      // Recarregar dados do prontuário para sincronizar o estado
+      await loadProntuarioData(patientId);
+      setIsEditMode(false);
+    }
   };
 
-  const handleSaveQuickEntry = () => {
-    if (!quickEntryForm.patient || !quickEntryForm.content) {
+  const handleAddEntry = async () => {
+    console.log('Adicionando entrada - patientId:', patientId);
+    console.log('Formulário:', newEntryForm);
+    
+    if (!newEntryForm.content.trim() || !patientId) {
       toast({
         title: "Erro",
-        description: "Selecione um paciente e adicione conteúdo.",
+        description: "Conteúdo é obrigatório.",
         variant: "destructive"
       });
       return;
     }
 
-    toast({
-      title: "Entrada salva!",
-      description: `Prontuário atualizado para ${quickEntryForm.patient}.`
-    });
-    setQuickEntryForm({ patient: "", sessionType: "", content: "" });
+    const newEntry: ProntuarioEntry = {
+      id: Date.now().toString(),
+      date: newEntryForm.date,
+      type: newEntryForm.type,
+      content: newEntryForm.content,
+      psychologist: "Dra. Maria Silva" // Substitua pelo usuário logado
+    };
+
+    console.log('Nova entrada criada:', newEntry);
+    const success = await addEvolucao(patientId, newEntry);
+    
+    if (success) {
+      // Recarregar dados do prontuário
+      await loadProntuarioData(patientId);
+      
+      setNewEntryForm({
+        type: 'evolucao',
+        content: "",
+        date: new Date().toISOString().split('T')[0]
+      });
+      setIsNewEntryModalOpen(false);
+    }
   };
 
-  const handleEditEntry = (entry: any) => {
-    setSelectedEntry(entry);
-    setIsEditModalOpen(true);
+  const handleDeleteEntry = async (entryId: string) => {
+    if (!patientId) return;
+    
+    const success = await deleteEvolucao(patientId, entryId);
+    
+    if (success) {
+      // Recarregar dados do prontuário
+      await loadProntuarioData(patientId);
+    }
   };
 
-  const handleAttachFile = (entry: any) => {
-    toast({
-      title: "Funcionalidade em desenvolvimento",
-      description: "Upload de arquivos será implementado em breve."
-    });
+  const handleUploadAnexo = async (file: File) => {
+    if (!patientId) return;
+    
+    const newAnexo: Anexo = {
+      id: Date.now().toString(),
+      name: file.name,
+      type: file.type,
+      size: `${(file.size / 1024).toFixed(0)} KB`,
+      uploadDate: new Date().toISOString().split('T')[0]
+    };
+
+    const success = await addAnexo(patientId, newAnexo);
+    
+    if (success) {
+      // Recarregar dados do prontuário
+      await loadProntuarioData(patientId);
+    }
   };
 
-  const handleDownloadAttachment = (attachment: string) => {
-    toast({
-      title: "Download iniciado",
-      description: `Baixando ${attachment}...`
-    });
-  };
-
-  return (
-    <div className="space-y-6 p-4 md:p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold text-foreground">Prontuários</h1>
-            <Lock className="h-5 w-5 text-primary" />
+  if (!patientId) {
+    // Página de listagem de prontuários
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Prontuários Psicológicos</h1>
+            <p className="text-gray-600 mt-1">Selecione um paciente para acessar seu prontuário</p>
           </div>
-          <p className="text-muted-foreground">
-            Área segura e criptografada - somente o psicólogo visualiza
-          </p>
         </div>
-        <Dialog open={isNewEntryModalOpen} onOpenChange={setIsNewEntryModalOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nova Entrada
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {patients.map((patient) => (
+            <Card key={patient.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                    <User className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">{patient.name}</h3>
+                    <p className="text-sm text-gray-600">{patient.email || "Sem email"}</p>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">CPF:</span>
+                    <span>{patient.cpf || "Não informado"}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Telefone:</span>
+                    <span>{patient.phone || "Não informado"}</span>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => navigate(`/prontuarios/${patient.id}`)}
+                  className="w-full gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Acessar Prontuário
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {patients.length === 0 && (
+          <div className="text-center py-12">
+            <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum paciente encontrado</h3>
+            <p className="text-gray-600 mb-4">
+              Adicione pacientes para começar a criar prontuários psicológicos.
+            </p>
+            <Button onClick={() => navigate("/pacientes")}>
+              Ir para Pacientes
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Criar Nova Entrada</DialogTitle>
-              <DialogDescription>Adicione uma nova entrada ao prontuário</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Paciente *</Label>
-                  <Select value={newEntryForm.patient} onValueChange={(value) => setNewEntryForm({...newEntryForm, patient: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar paciente" />
-                    </SelectTrigger>
-                      <SelectContent>
-                        {patients.map((patient) => (
-                          <SelectItem key={patient.id} value={patient.name}>
-                            {patient.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Tipo de Sessão</Label>
-                  <Select value={newEntryForm.sessionType} onValueChange={(value) => setNewEntryForm({...newEntryForm, sessionType: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Tipo de sessão" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="individual">Sessão Individual</SelectItem>
-                      <SelectItem value="avaliacao">Avaliação</SelectItem>
-                      <SelectItem value="grupo">Sessão em Grupo</SelectItem>
-                      <SelectItem value="familiar">Terapia Familiar</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Diagnóstico/CID</Label>
-                <Input
-                  placeholder="CID ou diagnóstico..."
-                  value={newEntryForm.diagnosis}
-                  onChange={(e) => setNewEntryForm({...newEntryForm, diagnosis: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Conteúdo da Sessão *</Label>
-                <Textarea 
-                  placeholder="Descreva detalhadamente o que aconteceu na sessão..."
-                  className="min-h-[150px]"
-                  value={newEntryForm.content}
-                  onChange={(e) => setNewEntryForm({...newEntryForm, content: e.target.value})}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsNewEntryModalOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleCreateEntry}>
-                  Criar Entrada
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Buscar nas anotações..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar por paciente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os pacientes</SelectItem>
-                {patients.map((patient) => (
-                  <SelectItem key={patient.id} value={patient.name}>
-                    {patient.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Entries Timeline */}
-      <div className="space-y-4">
-        {filteredEntries.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              {searchTerm || selectedPatient ? (
-                <p className="text-muted-foreground">
-                  Nenhuma entrada encontrada com os filtros aplicados
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-muted-foreground">
-                    Nenhuma entrada de prontuário ainda
-                  </p>
-                  <Dialog open={isNewEntryModalOpen} onOpenChange={setIsNewEntryModalOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="gap-2">
-                        <Plus className="h-4 w-4" />
-                        Criar Primeira Entrada
-                      </Button>
-                    </DialogTrigger>
-                  </Dialog>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {filteredEntries.map((entry) => (
-              <Card key={entry.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-primary" />
-                        <CardTitle className="text-lg">{entry.patient}</CardTitle>
-                      </div>
-                      <Badge variant="outline">
-                        Sessão {entry.session}
-                      </Badge>
-                      <Badge variant="secondary">
-                        {entry.type}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      {new Date(entry.date).toLocaleDateString('pt-BR', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long', 
-                        day: 'numeric'
-                      })}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="prose prose-sm max-w-none">
-                    <p className="text-foreground leading-relaxed">
-                      {entry.content}
-                    </p>
-                  </div>
-
-                  {entry.attachments.length > 0 && (
-                    <div className="border-t pt-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Paperclip className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Anexos</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {entry.attachments.map((attachment, index) => (
-                          <Badge 
-                            key={index} 
-                            variant="outline" 
-                            className="gap-1 cursor-pointer hover:bg-muted"
-                            onClick={() => handleDownloadAttachment(attachment)}
-                          >
-                            <FileText className="h-3 w-3" />
-                            {attachment}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end gap-2 pt-4 border-t">
-                    <Button variant="outline" size="sm" onClick={() => handleEditEntry(entry)}>
-                      Editar
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleAttachFile(entry)}>
-                      Anexar Arquivo
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
           </div>
         )}
       </div>
+    );
+  }
 
-      {/* Quick Entry Form */}
+  if (!selectedPatient) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <FileText className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Carregando...</h3>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/pacientes/${patientId}`)}
+            className="gap-2"
+          >
+            ← Voltar ao Perfil
+          </Button>
+          <div>
+                            <h1 className="text-3xl font-bold text-foreground">Prontuário Psicológico</h1>
+                <p className="text-muted-foreground mt-1">Paciente: {selectedPatient.name}</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={isEditMode ? "default" : "outline"}
+            onClick={() => setIsEditMode(!isEditMode)}
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            {isEditMode ? "Salvar" : "Editar"}
+          </Button>
+          {isEditMode && (
+            <Button onClick={handleSaveProntuario}>
+              <Save className="w-4 h-4 mr-2" />
+              Salvar
+            </Button>
+          )}
+        </div>
+                </div>
+
+      <Tabs defaultValue="dados" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="dados">Dados do Paciente</TabsTrigger>
+          <TabsTrigger value="avaliacao">Avaliação da Demanda</TabsTrigger>
+          <TabsTrigger value="evolucao">Evolução</TabsTrigger>
+          <TabsTrigger value="encaminhamento">Encaminhamento</TabsTrigger>
+          <TabsTrigger value="anexos">Anexos</TabsTrigger>
+        </TabsList>
+
+        {/* Dados do Paciente */}
+        <TabsContent value="dados" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Dados do Paciente</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Nome</Label>
+                <Input value={selectedPatient.name} disabled />
+                </div>
+              <div>
+                <Label>CPF</Label>
+                <Input value={selectedPatient.cpf || "Não informado"} disabled />
+              </div>
+              <div>
+                <Label>Endereço</Label>
+                <Input value={selectedPatient.address || "Não informado"} disabled />
+              </div>
+              <div>
+                <Label>Data de Nascimento</Label>
+                <Input value={selectedPatient.birth_date || "Não informado"} disabled />
+              </div>
+              <div>
+                <Label>Profissão</Label>
+                <Input value={selectedPatient.profession || "Não informado"} disabled />
+              </div>
+              <div>
+                <Label>Telefone de Contato</Label>
+                <Input value={selectedPatient.phone || "Não informado"} disabled />
+            </div>
+              <div>
+                <Label>E-mail</Label>
+                <Input value={selectedPatient.email || "Não informado"} disabled />
+      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Avaliação da Demanda */}
+        <TabsContent value="avaliacao" className="space-y-4">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Nova Entrada Rápida</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Select value={quickEntryForm.patient} onValueChange={(value) => setQuickEntryForm({...quickEntryForm, patient: value})}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar paciente" />
-              </SelectTrigger>
-              <SelectContent>
-                {patients.map((patient) => (
-                  <SelectItem key={patient.id} value={patient.name}>
-                    {patient.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={quickEntryForm.sessionType} onValueChange={(value) => setQuickEntryForm({...quickEntryForm, sessionType: value})}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tipo de sessão" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="individual">Sessão Individual</SelectItem>
-                <SelectItem value="avaliacao">Avaliação</SelectItem>
-                <SelectItem value="grupo">Sessão em Grupo</SelectItem>
-                <SelectItem value="familiar">Terapia Familiar</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <Textarea 
-            placeholder="Digite suas anotações da sessão..."
-            className="min-h-[100px]"
-            value={quickEntryForm.content}
-            onChange={(e) => setQuickEntryForm({...quickEntryForm, content: e.target.value})}
-          />
-          
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => handleAttachFile(null)}>
-              Anexar Arquivo
-            </Button>
-            <Button onClick={handleSaveQuickEntry}>
-              Salvar Entrada
-            </Button>
-          </div>
+            <CardHeader>
+              <CardTitle>Avaliação da Demanda e Definição dos Objetivos do Trabalho</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Descrever o motivo da busca por atendimento psicológico e os objetivos terapêuticos iniciais, 
+                bem como a metodologia a ser adotada no processo terapêutico.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={prontuarioData.avaliacaoDemanda}
+                onChange={(e) => setProntuarioData(prev => ({ ...prev, avaliacaoDemanda: e.target.value }))}
+                disabled={!isEditMode}
+                placeholder="Descreva a avaliação da demanda, objetivos terapêuticos e metodologia..."
+                rows={10}
+                className="min-h-[200px]"
+              />
         </CardContent>
       </Card>
+        </TabsContent>
 
-      {/* Edit Modal */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        {/* Evolução */}
+        <TabsContent value="evolucao" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Evolução</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Registro de sessão. Registro sucinto e objetivo das intervenções psicológicas, 
+                    observações relevantes e estratégias utilizadas em cada sessão.
+                  </p>
+                </div>
+                {isEditMode && (
+                  <Button onClick={() => setIsNewEntryModalOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nova Entrada
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Seção de Agendamentos do Paciente */}
+              {patientId && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-muted-foreground" />
+                    <h4 className="font-semibold text-lg">Agendamentos do Paciente</h4>
+                  </div>
+                  
+                  {(() => {
+                    const patientAppointments = agendaSessoes.filter(appointment => 
+                      appointment.pacienteId === patientId
+                    );
+                    
+                    if (patientAppointments.length === 0) {
+                      return (
+                        <div className="text-center py-4 text-muted-foreground border border-border rounded-lg bg-muted/30">
+                          <Clock className="mx-auto h-8 w-8 mb-2" />
+                          <p>Nenhum agendamento encontrado para este paciente.</p>
+                        </div>
+                      );
+                    }
+                    
+                                         return (
+                       <div className="grid gap-3">
+                         {patientAppointments
+                           .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+                           .map((appointment) => (
+                           <div key={appointment.id} className="border border-border rounded-lg p-3 bg-card hover:bg-muted/50 transition-colors">
+                             <div className="flex justify-between items-start">
+                               <div className="flex-1">
+                                 <div className="flex items-center gap-2 mb-1">
+                                   <Calendar className="w-4 h-4 text-muted-foreground" />
+                                   <span className="font-medium">
+                                     {new Date(appointment.data).toLocaleDateString('pt-BR')} às {appointment.horario}
+                                   </span>
+                                   <Badge variant="outline" className="text-xs">
+                                     {appointment.status === 1 ? "✓ Realizado" :
+                                      appointment.status === 0 ? "⏰ Agendado" :
+                                      appointment.status === 2 ? "🔄 Em Andamento" : "❌ Cancelado"}
+                                   </Badge>
+                                 </div>
+                                 <p className="text-sm text-muted-foreground">
+                                   {appointment.tipoDaConsulta} • {appointment.modalidade}
+                                 </p>
+                                 {appointment.observacao && (
+                                   <p className="text-sm text-muted-foreground mt-1">
+                                     Obs: {appointment.observacao}
+                                   </p>
+                                 )}
+                               </div>
+                               {isEditMode && appointment.status === 1 && (
+                                 <Button
+                                   variant="outline"
+                                   size="sm"
+                                   onClick={() => {
+                                     setNewEntryForm({
+                                       type: 'evolucao',
+                                       content: "",
+                                       date: new Date(appointment.data).toISOString().split('T')[0]
+                                     });
+                                     setIsNewEntryModalOpen(true);
+                                   }}
+                                 >
+                                   <Plus className="w-3 h-3 mr-1" />
+                                   Adicionar Evolução
+                      </Button>
+                               )}
+                             </div>
+                           </div>
+                         ))}
+                       </div>
+                     );
+                  })()}
+                </div>
+              )}
+              
+              <Separator />
+              
+              {/* Entradas de Evolução */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-muted-foreground" />
+                  <h4 className="font-semibold text-lg">Entradas de Evolução</h4>
+                </div>
+                
+                {(!prontuarioData.evolucao || prontuarioData.evolucao.length === 0) ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="mx-auto h-12 w-12 mb-4" />
+                    <p>Nenhuma entrada de evolução registrada.</p>
+                  </div>
+        ) : (
+          <div className="space-y-4">
+                    {prontuarioData.evolucao.map((entry) => (
+                      <div key={entry.id} className="border border-border rounded-lg p-4 space-y-2 bg-card">
+                        <div className="flex justify-between items-start">
+                          <div>
+                      <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-muted-foreground" />
+                              <span className="font-medium">{new Date(entry.date).toLocaleDateString('pt-BR')}</span>
+                              <Badge variant="secondary">{entry.type}</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{entry.psychologist}</p>
+                          </div>
+                          {isEditMode && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteEntry(entry.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <Separator />
+                        <div className="text-sm whitespace-pre-wrap">{entry.content}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Encaminhamento */}
+        <TabsContent value="encaminhamento" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Encaminhamento e/ou Encerramento</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Descrever, se for o caso, os motivos do encaminhamento para outro profissional ou instituição, 
+                ou o encerramento do processo terapêutico, incluindo data e justificativa.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={prontuarioData.encaminhamento}
+                onChange={(e) => setProntuarioData(prev => ({ ...prev, encaminhamento: e.target.value }))}
+                disabled={!isEditMode}
+                placeholder="Descreva o encaminhamento ou encerramento do processo terapêutico..."
+                rows={8}
+                className="min-h-[150px]"
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Anexos */}
+        <TabsContent value="anexos" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Anexos</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Anexar cópias de relatórios, pareceres, declarações, termos de consentimento 
+                    ou quaisquer outros documentos emitidos durante o acompanhamento.
+                  </p>
+                </div>
+                {isEditMode && (
+                  <Button onClick={() => setIsAnexoModalOpen(true)}>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Adicionar Anexo
+                  </Button>
+                )}
+                  </div>
+                </CardHeader>
+            <CardContent>
+              {prontuarioData.anexos.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Paperclip className="mx-auto h-12 w-12 mb-4" />
+                  <p>Nenhum anexo adicionado.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {prontuarioData.anexos.map((anexo) => (
+                    <div key={anexo.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
+                      <div className="flex items-center gap-3">
+                        <Paperclip className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">{anexo.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {anexo.size} • {anexo.uploadDate}
+                    </p>
+                  </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm">
+                          <Download className="w-4 h-4" />
+                        </Button>
+                        {isEditMode && (
+                          <Button variant="ghost" size="sm">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+            ))}
+          </div>
+        )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Modal Nova Entrada */}
+      <Dialog open={isNewEntryModalOpen} onOpenChange={setIsNewEntryModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Editar Entrada</DialogTitle>
-            <DialogDescription>Modifique a entrada do prontuário</DialogDescription>
+            <DialogTitle>Nova Entrada de Evolução</DialogTitle>
+            <DialogDescription>
+              Adicione uma nova entrada ao prontuário do paciente.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Textarea 
-              placeholder="Edite o conteúdo da entrada..."
-              className="min-h-[150px]"
-              defaultValue={selectedEntry?.content}
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
-                Cancelar
+            <div>
+              <Label>Data da Sessão</Label>
+              <Input
+                type="date"
+                value={newEntryForm.date}
+                onChange={(e) => setNewEntryForm(prev => ({ ...prev, date: e.target.value }))}
+              />
+      </div>
+            <div>
+              <Label>Tipo de Entrada</Label>
+              <Select
+                value={newEntryForm.type}
+                onValueChange={(value: 'avaliacao' | 'evolucao' | 'encaminhamento') => 
+                  setNewEntryForm(prev => ({ ...prev, type: value }))
+                }
+              >
+              <SelectTrigger>
+                  <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                  <SelectItem value="evolucao">Evolução</SelectItem>
+                <SelectItem value="avaliacao">Avaliação</SelectItem>
+                  <SelectItem value="encaminhamento">Encaminhamento</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+            <div>
+              <Label>Conteúdo</Label>
+          <Textarea 
+                value={newEntryForm.content}
+                onChange={(e) => setNewEntryForm(prev => ({ ...prev, content: e.target.value }))}
+                placeholder="Descreva as observações, intervenções e estratégias utilizadas..."
+                rows={8}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsNewEntryModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddEntry}>
+              Adicionar Entrada
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Anexo */}
+      <Dialog open={isAnexoModalOpen} onOpenChange={setIsAnexoModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar Anexo</DialogTitle>
+            <DialogDescription>
+              Selecione um arquivo para anexar ao prontuário.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+                            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center bg-muted/30">
+              <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-sm text-muted-foreground">
+                Arraste e solte um arquivo aqui, ou clique para selecionar
+              </p>
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleUploadAnexo(file);
+                    setIsAnexoModalOpen(false);
+                  }
+                }}
+                id="file-upload"
+              />
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <Button variant="outline" className="mt-2">
+                  Selecionar Arquivo
               </Button>
-              <Button onClick={() => {
-                toast({
-                  title: "Entrada atualizada!",
-                  description: "As alterações foram salvas com sucesso."
-                });
-                setIsEditModalOpen(false);
-              }}>
-                Salvar Alterações
-              </Button>
+              </label>
             </div>
           </div>
         </DialogContent>

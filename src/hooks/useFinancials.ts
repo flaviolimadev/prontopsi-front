@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { usePagamentos } from './usePagamentos';
 
 export interface FinancialRecord {
   id: string;
@@ -146,115 +147,59 @@ const mockFinancialRecords: FinancialRecord[] = [
 ];
 
 export function useFinancials() {
-  const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>(mockFinancialRecords);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { 
+    pagamentos, 
+    loading, 
+    error 
+  } = usePagamentos();
+  
   const { toast } = useToast();
 
+  // Converter Pagamento para FinancialRecord
+  const convertToFinancialRecord = (pagamento: any): FinancialRecord => ({
+    id: pagamento.id,
+    user_id: pagamento.userId || 'user-1',
+    patient_id: pagamento.pacienteId,
+    appointment_id: pagamento.agendaSessaoId,
+    date: pagamento.data,
+    amount: Number(pagamento.value || 0),
+    type: 'receita', // Assumindo receita como padrão
+    description: pagamento.descricao || 'Pagamento de sessão',
+    payment_method: pagamento.type === 1 ? 'pix' : 
+                   pagamento.type === 2 ? 'cartao_credito' :
+                   pagamento.type === 3 ? 'transferencia' :
+                   pagamento.type === 4 ? 'dinheiro' : undefined,
+    status: pagamento.status === 1 || pagamento.status === 2 ? 'pago' : 
+           pagamento.status === 0 ? 'pendente' : 'atrasado',
+    session_date: pagamento.data,
+    created_at: pagamento.createdAt || new Date().toISOString(),
+    updated_at: pagamento.updatedAt || new Date().toISOString()
+  });
+
+  // Converter pagamentos para formato de exibição
+  const financialRecords = pagamentos.map(convertToFinancialRecord);
+
   const fetchFinancialRecords = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Simular delay de rede
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setFinancialRecords(mockFinancialRecords);
-    } catch (error: any) {
-      console.error('Erro ao buscar registros financeiros:', error);
-      setError(error.message || 'Erro ao carregar registros financeiros');
-      
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar os registros financeiros.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
+    // Dados já são carregados pelo hook usePagamentos
+    return;
   };
 
   const createFinancialRecord = async (recordData: CreateFinancialRecordData): Promise<FinancialRecord | null> => {
-    try {
-      const newRecord: FinancialRecord = {
-        id: Date.now().toString(),
-        user_id: 'user-1',
-        patient_id: recordData.patient_id,
-        appointment_id: recordData.appointment_id,
-        date: recordData.date,
-        amount: recordData.amount,
-        type: recordData.type,
-        description: recordData.description,
-        payment_method: recordData.payment_method,
-        status: recordData.status || 'pago',
-        session_date: recordData.session_date,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      setFinancialRecords(prev => [newRecord, ...prev]);
-      
-      toast({
-        title: 'Sucesso',
-        description: 'Registro financeiro criado com sucesso!',
-      });
-
-      return newRecord;
-    } catch (error: any) {
-      console.error('Erro ao criar registro financeiro:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível criar o registro financeiro.',
-        variant: 'destructive',
-      });
-      return null;
-    }
+    // Implementação simplificada - os dados financeiros vêm dos pagamentos
+    console.log('createFinancialRecord não implementado - use usePagamentos');
+    return null;
   };
 
   const updateFinancialRecord = async (id: string, recordData: UpdateFinancialRecordData): Promise<boolean> => {
-    try {
-      setFinancialRecords(prev => prev.map(record => 
-        record.id === id 
-          ? { ...record, ...recordData, updated_at: new Date().toISOString() }
-          : record
-      ));
-
-      toast({
-        title: 'Sucesso',
-        description: 'Registro financeiro atualizado com sucesso!',
-      });
-
-      return true;
-    } catch (error: any) {
-      console.error('Erro ao atualizar registro financeiro:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar o registro financeiro.',
-        variant: 'destructive',
-      });
-      return false;
-    }
+    // Implementação simplificada - os dados financeiros vêm dos pagamentos
+    console.log('updateFinancialRecord não implementado - use usePagamentos');
+    return false;
   };
 
   const deleteFinancialRecord = async (id: string): Promise<boolean> => {
-    try {
-      setFinancialRecords(prev => prev.filter(record => record.id !== id));
-
-      toast({
-        title: 'Sucesso',
-        description: 'Registro financeiro removido com sucesso!',
-      });
-
-      return true;
-    } catch (error: any) {
-      console.error('Erro ao deletar registro financeiro:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível remover o registro financeiro.',
-        variant: 'destructive',
-      });
-      return false;
-    }
+    // Implementação simplificada - os dados financeiros vêm dos pagamentos
+    console.log('deleteFinancialRecord não implementado - use usePagamentos');
+    return false;
   };
 
   const getFinancialRecordById = (id: string): FinancialRecord | undefined => {
@@ -304,12 +249,9 @@ export function useFinancials() {
   };
 
   const retry = () => {
-    fetchFinancialRecords();
+    // Dados são recarregados automaticamente pelo hook usePagamentos
+    return;
   };
-
-  useEffect(() => {
-    fetchFinancialRecords();
-  }, []);
 
   return {
     financialRecords,

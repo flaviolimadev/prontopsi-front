@@ -1,0 +1,31 @@
+# Configuração para Coolify - ProntuPsi Frontend
+# https://coolify.io/docs
+
+version: '1.0'
+
+services:
+  prontupsi-frontend:
+    image: prontupsi-frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=${VITE_API_URL}
+      - VITE_APP_NAME=ProntuPsi
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M

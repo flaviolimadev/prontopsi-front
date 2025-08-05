@@ -6,7 +6,7 @@ class ApiService {
   constructor() {
     this.api = axios.create({
       baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
-      timeout: 10000,
+      timeout: 30000, // Aumentar timeout para 30 segundos
       headers: {
         'Content-Type': 'application/json',
       },
@@ -16,22 +16,19 @@ class ApiService {
     this.api.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem('auth_token');
-        console.log('Token encontrado:', token ? 'Sim' : 'Não');
+        console.log('Interceptor - Token encontrado:', token ? 'Sim' : 'Não');
+        console.log('Interceptor - URL da requisição:', config.url);
+        console.log('Interceptor - Método:', config.method);
+        
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          console.log('Interceptor - Token adicionado ao header');
         }
         
         // Não sobrescrever Content-Type para multipart/form-data
         if (config.headers['Content-Type'] === 'multipart/form-data') {
           delete config.headers['Content-Type'];
         }
-        
-        console.log('Request config:', {
-          url: config.url,
-          method: config.method,
-          headers: config.headers,
-          data: config.data
-        });
         
         return config;
       },

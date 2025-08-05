@@ -9,11 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarDays, Clock, User, Plus, Edit, Trash2, RefreshCw, AlertCircle, Repeat, ChevronLeft, ChevronRight, ExternalLink, Calendar as CalendarIcon, MapPin, Clock as ClockIcon, Search, Filter, X, CreditCard, DollarSign } from "lucide-react";
+import { CalendarDays, Clock, User, Plus, Edit, Trash2, RefreshCw, AlertCircle, Repeat, ChevronLeft, ChevronRight, ExternalLink, Calendar as CalendarIcon, MapPin, Clock as ClockIcon, Search, Filter, X, CreditCard, DollarSign, CheckCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAgendaSessoes } from "@/hooks/useAgendaSessoes";
 import { usePacientes } from "@/hooks/usePacientes";
-import { usePacotes } from "@/hooks/usePacotes";
+import { usePacotes } from "../hooks/usePacotes";
 import { usePagamentos } from "@/hooks/usePagamentos";
 import { AgendaSkeleton } from "@/components/ui/agenda-skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -45,6 +45,14 @@ interface RecurringAppointmentData {
 export default function Agenda() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Função auxiliar para formatar data sem problemas de fuso horário
+  const formatDateToYYYYMMDD = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
   const { 
     agendaSessoes, 
     loading: appointmentsLoading, 
@@ -90,14 +98,16 @@ export default function Agenda() {
   const [isEditPagamentoModalOpen, setIsEditPagamentoModalOpen] = useState(false);
   const [selectedAgendaSessao, setSelectedAgendaSessao] = useState<any>(null);
   const [selectedPagamento, setSelectedPagamento] = useState<any>(null);
+  const [agendaPagamentos, setAgendaPagamentos] = useState<{[key: string]: any[]}>({});
   const [pagamentoForm, setPagamentoForm] = useState({
     pacienteId: '',
     pacoteId: null as string | null,
-    data: new Date().toISOString().split('T')[0],
-    vencimento: new Date().toISOString().split('T')[0],
+    data: formatDateToYYYYMMDD(new Date()),
+    vencimento: formatDateToYYYYMMDD(new Date()),
     value: 0,
     descricao: '',
     type: null as number | null,
+    status: 0 as number,
     txid: '',
   });
   
@@ -115,7 +125,7 @@ export default function Agenda() {
   
   const [formData, setFormData] = useState<AppointmentFormData>({
     pacienteId: "",
-    data: new Date().toISOString().split('T')[0],
+    data: formatDateToYYYYMMDD(new Date()),
     horario: "09:00",
     duracao: 50,
     tipoDaConsulta: "Consulta",
@@ -140,6 +150,8 @@ export default function Agenda() {
   const activePatients = useMemo(() => {
     return pacientes.filter(paciente => paciente.status === 1);
   }, [pacientes]);
+
+
 
   // Função para verificar se há filtros ativos
   const hasActiveFilters = searchTerm.trim() || statusFilter !== null || dateRangeFilter.startDate || dateRangeFilter.endDate;
@@ -190,7 +202,7 @@ export default function Agenda() {
       appointmentsToShow = filteredAgendaSessoes;
     } else {
       // Se não há filtros, mostrar apenas as consultas do dia selecionado
-      const selectedDateStr = selectedDate.toISOString().split('T')[0];
+      const selectedDateStr = formatDateToYYYYMMDD(selectedDate);
       appointmentsToShow = filteredAgendaSessoes.filter(sessao => sessao.data === selectedDateStr);
     }
     
@@ -217,6 +229,40 @@ export default function Agenda() {
         return a.horario.localeCompare(b.horario);
       });
   }, [filteredAgendaSessoes, pacientes, selectedDate, hasActiveFilters]);
+
+  // Carregar pagamentos para todas as sessões visíveis (filtradas ou do dia)
+  useEffect(() => {
+    const loadPagamentosForVisible = async () => {
+      if (dayAppointments.length === 0) return;
+      
+      const pagamentosMap: {[key: string]: any[]} = {};
+      
+      // Carregar pagamentos para cada sessão visível
+      await Promise.all(
+        dayAppointments.map(async (appointment) => {
+          // Só carregar se ainda não estiver no estado
+          if (!agendaPagamentos[appointment.id]) {
+            try {
+              const pagamentos = await fetchPagamentosByAgendaSessao(appointment.id);
+              pagamentosMap[appointment.id] = pagamentos || [];
+            } catch (error) {
+              console.error(`Erro ao carregar pagamentos para sessão ${appointment.id}:`, error);
+              pagamentosMap[appointment.id] = [];
+            }
+          }
+        })
+      );
+      
+      if (Object.keys(pagamentosMap).length > 0) {
+        setAgendaPagamentos(prev => ({
+          ...prev,
+          ...pagamentosMap
+        }));
+      }
+    };
+
+    loadPagamentosForVisible();
+  }, [dayAppointments, agendaPagamentos, fetchPagamentosByAgendaSessao]);
 
   // Se ambos ainda estão carregando inicialmente, mostrar skeleton
   if (appointmentsLoading && patientsLoading) {
@@ -298,8 +344,9 @@ export default function Agenda() {
     try {
       if (recurringData.isRecurring) {
         // Criar múltiplas consultas recorrentes
+        const startDate = new Date(formData.data + 'T00:00:00');
         const dates = calculateRecurringDates(
-          new Date(formData.data),
+          startDate,
           recurringData.frequency,
           recurringData.dayOfWeek!,
           recurringData.quantity
@@ -308,7 +355,7 @@ export default function Agenda() {
         const promises = dates.map(async date => {
           const appointmentData = {
             ...formData,
-            data: date.toISOString().split('T')[0]
+            data: formatDateToYYYYMMDD(date)
           };
           
           // Criar a sessão
@@ -318,10 +365,11 @@ export default function Agenda() {
           const pagamentoData = {
             pacienteId: formData.pacienteId,
             pacoteId: formData.tipoPagamento === 'pacote' ? formData.pacoteId : null,
-            data: date.toISOString().split('T')[0],
-            vencimento: date.toISOString().split('T')[0], // Vencimento no mesmo dia da consulta
+            agendaSessaoId: session.id, // Vincular ao ID da agenda criada
+            data: formatDateToYYYYMMDD(date),
+            vencimento: formatDateToYYYYMMDD(date), // Vencimento no mesmo dia da consulta
             value: formData.tipoPagamento === 'pacote' 
-              ? Number(pacotes.find(p => p.id === formData.pacoteId)?.value || 0)
+              ? Number(pacotes?.find(p => p.id === formData.pacoteId)?.value || 0)
               : Number(formData.valorAvulso || 0),
             descricao: `Pagamento para consulta em ${date.toLocaleDateString('pt-BR')} - ${formData.tipoDaConsulta}`,
             type: null, // Será definido quando o pagamento for realizado
@@ -347,12 +395,13 @@ export default function Agenda() {
         const pagamentoData = {
           pacienteId: formData.pacienteId,
           pacoteId: formData.tipoPagamento === 'pacote' ? formData.pacoteId : null,
+          agendaSessaoId: session.id, // Vincular ao ID da agenda criada
           data: formData.data,
           vencimento: formData.data, // Vencimento no mesmo dia da consulta
           value: formData.tipoPagamento === 'pacote' 
-            ? Number(pacotes.find(p => p.id === formData.pacoteId)?.value || 0)
+            ? Number(pacotes?.find(p => p.id === formData.pacoteId)?.value || 0)
             : Number(formData.valorAvulso || 0),
-          descricao: `Pagamento para consulta em ${new Date(formData.data).toLocaleDateString('pt-BR')} - ${formData.tipoDaConsulta}`,
+          descricao: `Pagamento para consulta em ${new Date(formData.data + 'T00:00:00').toLocaleDateString('pt-BR')} - ${formData.tipoDaConsulta}`,
           type: null, // Será definido quando o pagamento for realizado
           txid: null
         };
@@ -397,13 +446,46 @@ export default function Agenda() {
 
   const handleDeleteAppointment = async (appointmentId: string) => {
     try {
+      // Primeiro, verificar se há pagamentos vinculados a esta sessão
+      const pagamentosVinculados = agendaPagamentos[appointmentId];
+      
+      // Se há pagamentos vinculados, excluí-los primeiro
+      if (pagamentosVinculados && pagamentosVinculados.length > 0) {
+        await Promise.all(
+          pagamentosVinculados.map(async (pagamento) => {
+            try {
+              await deletePagamento(pagamento.id);
+            } catch (error) {
+              console.error(`Erro ao excluir pagamento ${pagamento.id}:`, error);
+              // Continua mesmo se falhar para excluir outros pagamentos
+            }
+          })
+        );
+        
+        // Remover pagamentos do estado local
+        setAgendaPagamentos(prev => {
+          const newState = { ...prev };
+          delete newState[appointmentId];
+          return newState;
+        });
+      }
+      
+      // Depois excluir a sessão
       await deleteAgendaSessao(appointmentId);
+      
       toast({
         title: "Sessão excluída",
-        description: "A sessão foi removida com sucesso.",
+        description: pagamentosVinculados && pagamentosVinculados.length > 0 
+          ? "A sessão e seus pagamentos foram removidos com sucesso."
+          : "A sessão foi removida com sucesso.",
       });
     } catch (error) {
       console.error('Erro ao deletar sessão:', error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao excluir a sessão. Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -493,7 +575,7 @@ export default function Agenda() {
 
   // Função para obter consultas de um dia específico
   const getAppointmentsForDate = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatDateToYYYYMMDD(date);
     return filteredAgendaSessoes.filter(sessao => sessao.data === dateStr);
   };
 
@@ -539,6 +621,13 @@ export default function Agenda() {
     // Buscar pagamentos existentes para esta agenda
     try {
       const pagamentos = await fetchPagamentosByAgendaSessao(agendaSessao.id);
+      
+      // Atualizar o estado local com os pagamentos encontrados
+      setAgendaPagamentos(prev => ({
+        ...prev,
+        [agendaSessao.id]: pagamentos || []
+      }));
+      
       if (pagamentos && pagamentos.length > 0) {
         // Se já existe pagamento, abrir modal de edição
         setSelectedPagamento(pagamentos[0]);
@@ -550,6 +639,7 @@ export default function Agenda() {
           value: pagamentos[0].value,
           descricao: pagamentos[0].descricao || '',
           type: pagamentos[0].type,
+          status: pagamentos[0].status || 0,
           txid: pagamentos[0].txid || '',
         });
         setIsEditPagamentoModalOpen(true);
@@ -563,6 +653,7 @@ export default function Agenda() {
           value: agendaSessao.value || 0,
           descricao: `Pagamento para consulta em ${new Date(agendaSessao.data).toLocaleDateString('pt-BR')}`,
           type: null,
+          status: 0,
           txid: '',
         });
         setIsPagamentoModalOpen(true);
@@ -570,36 +661,45 @@ export default function Agenda() {
     } catch (error) {
       console.error('Erro ao buscar pagamentos:', error);
       // Em caso de erro, abrir modal de criação
-      setPagamentoForm({
-        pacienteId: agendaSessao.pacienteId,
-        pacoteId: null,
-        data: agendaSessao.data,
-        vencimento: agendaSessao.data,
-        value: agendaSessao.value || 0,
-        descricao: `Pagamento para consulta em ${new Date(agendaSessao.data).toLocaleDateString('pt-BR')}`,
-        type: null,
-        txid: '',
-      });
+              setPagamentoForm({
+          pacienteId: agendaSessao.pacienteId,
+          pacoteId: null,
+          data: agendaSessao.data,
+          vencimento: agendaSessao.data,
+          value: agendaSessao.value || 0,
+          descricao: `Pagamento para consulta em ${new Date(agendaSessao.data).toLocaleDateString('pt-BR')}`,
+          type: null,
+          status: 0,
+          txid: '',
+        });
       setIsPagamentoModalOpen(true);
     }
   };
 
   const handleCreatePagamento = async () => {
     try {
-      await createPagamento({
+      const newPagamento = await createPagamento({
         ...pagamentoForm,
         agendaSessaoId: selectedAgendaSessao.id,
       });
+      
+      // Atualizar o estado local com o novo pagamento
+      setAgendaPagamentos(prev => ({
+        ...prev,
+        [selectedAgendaSessao.id]: [newPagamento]
+      }));
+      
       setIsPagamentoModalOpen(false);
       setSelectedAgendaSessao(null);
       setPagamentoForm({
         pacienteId: '',
         pacoteId: null,
-        data: new Date().toISOString().split('T')[0],
-        vencimento: new Date().toISOString().split('T')[0],
+        data: formatDateToYYYYMMDD(new Date()),
+        vencimento: formatDateToYYYYMMDD(new Date()),
         value: 0,
         descricao: '',
         type: null,
+        status: 0,
         txid: '',
       });
     } catch (error) {
@@ -609,21 +709,29 @@ export default function Agenda() {
 
   const handleUpdatePagamento = async () => {
     try {
-      await updatePagamento(selectedPagamento.id, {
+      const updatedPagamento = await updatePagamento(selectedPagamento.id, {
         ...pagamentoForm,
         agendaSessaoId: selectedAgendaSessao.id,
       });
+      
+      // Atualizar o estado local com o pagamento atualizado
+      setAgendaPagamentos(prev => ({
+        ...prev,
+        [selectedAgendaSessao.id]: [updatedPagamento]
+      }));
+      
       setIsEditPagamentoModalOpen(false);
       setSelectedAgendaSessao(null);
       setSelectedPagamento(null);
       setPagamentoForm({
         pacienteId: '',
         pacoteId: null,
-        data: new Date().toISOString().split('T')[0],
-        vencimento: new Date().toISOString().split('T')[0],
+        data: formatDateToYYYYMMDD(new Date()),
+        vencimento: formatDateToYYYYMMDD(new Date()),
         value: 0,
         descricao: '',
         type: null,
+        status: 0,
         txid: '',
       });
     } catch (error) {
@@ -636,17 +744,26 @@ export default function Agenda() {
     
     try {
       await deletePagamento(selectedPagamento.id);
+      
+      // Remover o pagamento do estado local
+      setAgendaPagamentos(prev => {
+        const newState = { ...prev };
+        delete newState[selectedAgendaSessao.id];
+        return newState;
+      });
+      
       setIsEditPagamentoModalOpen(false);
       setSelectedAgendaSessao(null);
       setSelectedPagamento(null);
       setPagamentoForm({
         pacienteId: '',
         pacoteId: null,
-        data: new Date().toISOString().split('T')[0],
-        vencimento: new Date().toISOString().split('T')[0],
+        data: formatDateToYYYYMMDD(new Date()),
+        vencimento: formatDateToYYYYMMDD(new Date()),
         value: 0,
         descricao: '',
         type: null,
+        status: 0,
         txid: '',
       });
     } catch (error) {
@@ -685,6 +802,25 @@ export default function Agenda() {
       default: return 'Não informado';
     }
   };
+
+  // Função utilitária para exibir o ícone de status do pagamento
+  function getPagamentoStatusIcon(pagamentos: any[]): JSX.Element | null {
+    if (!pagamentos || pagamentos.length === 0) return null;
+    const status = pagamentos.some(p => p.status === 3)
+      ? 3
+      : pagamentos.some(p => p.status === 0)
+      ? 0
+      : pagamentos.some(p => p.status === 2)
+      ? 2
+      : pagamentos.some(p => p.status === 1)
+      ? 1
+      : null;
+    if (status === 0) return <AlertCircle className="w-5 h-5 text-yellow-500" />;
+    if (status === 1) return <CheckCircle className="w-5 h-5 text-green-500" />;
+    if (status === 2) return <CheckCircle2 className="w-5 h-5 text-blue-500" />;
+    if (status === 3) return <X className="w-5 h-5 text-red-500" />;
+    return null;
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -964,7 +1100,7 @@ export default function Agenda() {
                       <Label>Selecionar Pacote</Label>
                       {pacotesLoading ? (
                         <div className="h-10 w-full bg-muted animate-pulse rounded" />
-                      ) : pacotes.filter(pacote => pacote.ativo).length === 0 ? (
+                      ) : pacotes?.filter(pacote => pacote.ativo).length === 0 ? (
                         <div className="p-3 bg-muted rounded-md border">
                           <p className="text-sm text-muted-foreground">
                             Nenhum pacote ativo encontrado. 
@@ -981,7 +1117,7 @@ export default function Agenda() {
                             <SelectValue placeholder="Selecione um pacote" />
                           </SelectTrigger>
                           <SelectContent>
-                            {pacotes.filter(pacote => pacote.ativo).map((pacote) => (
+                            {pacotes?.filter(pacote => pacote.ativo).map((pacote) => (
                               <SelectItem key={pacote.id} value={pacote.id}>
                                 {pacote.title} - R$ {Number(pacote.value || 0).toFixed(2)}
                               </SelectItem>
@@ -1385,7 +1521,13 @@ export default function Agenda() {
             ) : (
               <div className="space-y-4">
                 {dayAppointments.map((appointment) => (
-                  <div key={appointment.id} className="group relative bg-card border rounded-xl p-6 hover:shadow-md transition-all duration-200 hover:border-primary/20">
+                  <div key={appointment.id} className={`group relative bg-card border rounded-xl p-4 sm:p-6 hover:shadow-md transition-all duration-200 hover:border-primary/20 ${
+                  agendaPagamentos[appointment.id] && 
+                  agendaPagamentos[appointment.id].length > 0 && 
+                  agendaPagamentos[appointment.id].some((p: any) => p.status === 0) 
+                    ? 'border-red-300 border-2' 
+                    : ''
+                }`}>
                     {/* Status indicator */}
                     <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-xl ${
                       appointment.status === 0 ? 'bg-yellow-500' :
@@ -1394,27 +1536,35 @@ export default function Agenda() {
                       'bg-red-500'
                     }`} />
                     
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4 flex-1">
+                    {/* Layout Mobile-First Responsivo */}
+                    <div className="space-y-4">
+                      {/* Cabeçalho com Avatar e Info Principal */}
+                      <div className="flex items-start gap-3">
                         {/* Avatar do paciente */}
-                        <div className="relative">
-                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border-2 border-primary/20">
-                            <User className="w-7 h-7 text-primary" />
+                        <div className="relative flex-shrink-0">
+                          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border-2 border-primary/20">
+                            <User className="w-5 h-5 sm:w-7 sm:h-7 text-primary" />
                           </div>
                           {/* Indicador de modalidade */}
-                          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background border-2 border-primary/20 flex items-center justify-center">
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-background border-2 border-primary/20 flex items-center justify-center">
                             <span className="text-xs">{getModalityIcon(appointment.modalidade)}</span>
                           </div>
                         </div>
 
-                        {/* Informações da consulta */}
+                        {/* Informações principais */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-lg truncate">{appointment.patientName}</h3>
-                            {getStatusBadge(appointment.status)}
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-2">
+                            <h3 className="font-semibold text-base sm:text-lg truncate">{appointment.patientName}</h3>
+                            <div className="flex items-center gap-2">
+                              {getStatusBadge(appointment.status)}
+                              {agendaPagamentos[appointment.id] && agendaPagamentos[appointment.id].length > 0 && (
+                                <span>{getPagamentoStatusIcon(agendaPagamentos[appointment.id])}</span>
+                              )}
+                            </div>
                           </div>
                           
-                                                    <div className="grid grid-cols-2 gap-4 mb-3">
+                          {/* Horário e Duração */}
+                          <div className="flex flex-wrap items-center gap-4 mb-2">
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <ClockIcon className="w-4 h-4" />
                               <span>{appointment.horario}</span>
@@ -1427,7 +1577,7 @@ export default function Agenda() {
                           
                           {/* Mostrar data quando há filtros ativos */}
                           {hasActiveFilters && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                               <CalendarDays className="w-4 h-4" />
                               <span>
                                 {new Date(appointment.data).toLocaleDateString('pt-BR', {
@@ -1439,7 +1589,8 @@ export default function Agenda() {
                             </div>
                           )}
 
-                          <div className="flex items-center gap-2 mb-2">
+                          {/* Badges de Tipo */}
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
                             <Badge variant="secondary" className="text-xs">
                               {appointment.tipoDaConsulta}
                             </Badge>
@@ -1447,55 +1598,78 @@ export default function Agenda() {
                               {appointment.tipoAtendimento}
                             </Badge>
                           </div>
-
-                          {appointment.observacao && (
-                            <div className="bg-muted/30 rounded-lg p-3 mt-3">
-                              <p className="text-sm text-muted-foreground">
-                                {appointment.observacao}
-                              </p>
-                            </div>
-                          )}
                         </div>
                       </div>
 
-                      {/* Ações */}
-                      <div className="flex flex-col gap-2 ml-4">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => navigateToPatientProfile(appointment.pacienteId)}
-                          className="flex items-center gap-2"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          Perfil
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => openEditModal(appointment)}
-                          className="flex items-center gap-2"
-                        >
-                          <Edit className="w-3 h-3" />
-                          Editar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => openPagamentoModal(appointment)}
-                          className="flex items-center gap-2"
-                        >
-                          <CreditCard className="w-3 h-3" />
-                          {appointment.pagamentos && appointment.pagamentos.length > 0 ? 'Editar Pagamento' : 'Adicionar Pagamento'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDeleteAppointment(appointment.id)}
-                          className="flex items-center gap-2 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Excluir
-                        </Button>
+                      {/* Observações */}
+                      {appointment.observacao && (
+                        <div className="bg-muted/30 rounded-lg p-3">
+                          <p className="text-sm text-muted-foreground">
+                            {appointment.observacao}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Ações - Layout Responsivo */}
+                      <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-border/50">
+                        {/* Primeira linha de ações em mobile, linha única em desktop */}
+                        <div className="flex flex-wrap gap-2 flex-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigateToPatientProfile(appointment.pacienteId)}
+                            className="flex items-center gap-2 flex-1 sm:flex-none"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Perfil</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openEditModal(appointment)}
+                            className="flex items-center gap-2 flex-1 sm:flex-none"
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>Editar</span>
+                          </Button>
+                        </div>
+                        
+                        {/* Segunda linha em mobile, continuação da linha em desktop */}
+                        <div className="flex flex-wrap gap-2 flex-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openPagamentoModal(appointment)}
+                            className={`flex items-center gap-2 flex-1 sm:flex-none ${
+                              agendaPagamentos[appointment.id] && 
+                              agendaPagamentos[appointment.id].length > 0 && 
+                              agendaPagamentos[appointment.id].some((p: any) => p.status === 0) 
+                                ? 'text-red-600 hover:text-red-700' 
+                                : ''
+                            }`}
+                          >
+                            <CreditCard className="w-3 h-3" />
+                            <span className="truncate">
+                              {agendaPagamentos[appointment.id] && agendaPagamentos[appointment.id].length > 0 ? 'Editar Pagamento' : 'Adicionar Pagamento'}
+                            </span>
+                            {agendaPagamentos[appointment.id] && 
+                             agendaPagamentos[appointment.id].length > 0 && 
+                             agendaPagamentos[appointment.id].some((p: any) => p.status === 0) && (
+                              <Badge variant="destructive" className="ml-1 text-xs hidden sm:inline-flex">
+                                Pendente
+                              </Badge>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteAppointment(appointment.id)}
+                            className="flex items-center gap-2 text-destructive hover:text-destructive flex-1 sm:flex-none"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Excluir</span>
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1649,7 +1823,7 @@ export default function Agenda() {
                 value={pagamentoForm.pacoteId || 'avulso'} 
                 onValueChange={(value) => {
                   const newPacoteId = value === 'avulso' ? null : value;
-                  const selectedPacote = value !== 'avulso' ? pacotes.find(p => p.id === value) : null;
+                  const selectedPacote = value !== 'avulso' ? pacotes?.find(p => p.id === value) : null;
                   setPagamentoForm({
                     ...pagamentoForm, 
                     pacoteId: newPacoteId,
@@ -1662,7 +1836,7 @@ export default function Agenda() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="avulso">Valor avulso</SelectItem>
-                  {pacotes.filter(pacote => pacote.ativo).map((pacote) => (
+                  {pacotes?.filter(pacote => pacote.ativo).map((pacote) => (
                     <SelectItem key={pacote.id} value={pacote.id}>
                       {pacote.title} - R$ {Number(pacote.value || 0).toFixed(2)}
                     </SelectItem>
@@ -1778,7 +1952,7 @@ export default function Agenda() {
                 value={pagamentoForm.pacoteId || 'avulso'} 
                 onValueChange={(value) => {
                   const newPacoteId = value === 'avulso' ? null : value;
-                  const selectedPacote = value !== 'avulso' ? pacotes.find(p => p.id === value) : null;
+                  const selectedPacote = value !== 'avulso' ? pacotes?.find(p => p.id === value) : null;
                   setPagamentoForm({
                     ...pagamentoForm, 
                     pacoteId: newPacoteId,
@@ -1791,7 +1965,7 @@ export default function Agenda() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="avulso">Valor avulso</SelectItem>
-                  {pacotes.filter(pacote => pacote.ativo).map((pacote) => (
+                  {pacotes?.filter(pacote => pacote.ativo).map((pacote) => (
                     <SelectItem key={pacote.id} value={pacote.id}>
                       {pacote.title} - R$ {Number(pacote.value || 0).toFixed(2)}
                     </SelectItem>
@@ -1854,6 +2028,23 @@ export default function Agenda() {
                   <SelectItem value="2">Cartão</SelectItem>
                   <SelectItem value="3">Boleto</SelectItem>
                   <SelectItem value="4">Espécie</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Status do Pagamento</Label>
+              <Select 
+                value={pagamentoForm.status?.toString() || '0'} 
+                onValueChange={(value) => setPagamentoForm({...pagamentoForm, status: parseInt(value)})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Pendente</SelectItem>
+                  <SelectItem value="1">Pago</SelectItem>
+                  <SelectItem value="2">Confirmado</SelectItem>
+                  <SelectItem value="3">Cancelado</SelectItem>
                 </SelectContent>
               </Select>
             </div>

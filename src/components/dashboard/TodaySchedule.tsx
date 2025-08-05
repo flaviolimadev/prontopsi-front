@@ -12,31 +12,35 @@ import { Clock, User, Calendar, CheckCircle2, AlertCircle, Plus } from "lucide-r
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { useAppointments } from "@/hooks/useAppointments";
-import { usePatients } from "@/hooks/usePatients";
+import { useAgendaSessoesReal } from "@/hooks/useAgendaSessoesReal";
+import { usePacientes } from "@/hooks/usePacientes";
 
 function AppointmentCard({ appointment, patientName }: { appointment: any; patientName: string }) {
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "confirmado":
-        return <Badge className="bg-success text-success-foreground">Confirmado</Badge>;
-      case "pendente":
-        return <Badge className="bg-warning text-warning-foreground">Pendente</Badge>;
+      case "agendado":
+        return <Badge variant="secondary">Agendado</Badge>;
+      case "em_andamento":
+        return <Badge className="bg-blue-500 text-white">Em Andamento</Badge>;
       case "realizado":
-        return <Badge variant="outline" className="border-success text-success">Realizado</Badge>;
+        return <Badge variant="outline" className="border-green-500 text-green-700">Realizado</Badge>;
+      case "cancelado":
+        return <Badge variant="destructive">Cancelado</Badge>;
       default:
-        return <Badge variant="secondary">Pendente</Badge>;
+        return <Badge variant="secondary">Agendado</Badge>;
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "confirmado":
-        return <CheckCircle2 className="w-4 h-4 text-success" />;
-      case "pendente":
-        return <AlertCircle className="w-4 h-4 text-warning" />;
+      case "agendado":
+        return <Clock className="w-4 h-4 text-blue-500" />;
+      case "em_andamento":
+        return <AlertCircle className="w-4 h-4 text-blue-600" />;
       case "realizado":
-        return <CheckCircle2 className="w-4 h-4 text-success" />;
+        return <CheckCircle2 className="w-4 h-4 text-green-600" />;
+      case "cancelado":
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
       default:
         return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
@@ -58,11 +62,18 @@ function AppointmentCard({ appointment, patientName }: { appointment: any; patie
           <div className="flex items-center gap-2 mb-1">
             <Clock className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium text-foreground">{appointment.time}</span>
+            <span className="text-sm text-muted-foreground">({appointment.duration}min)</span>
             {getStatusIcon(appointment.status)}
           </div>
           <p className="font-semibold text-foreground mb-1">{patientName}</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-1">
             {getStatusBadge(appointment.status)}
+            <Badge variant="outline" className="text-xs">
+              {appointment.type}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              {appointment.modality}
+            </Badge>
           </div>
           {appointment.notes && (
             <p className="text-sm text-muted-foreground mt-2">{appointment.notes}</p>
@@ -76,10 +87,10 @@ function AppointmentCard({ appointment, patientName }: { appointment: any; patie
 export function TodaySchedule() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { appointments = [] } = useAppointments();
-  const { patients = [] } = usePatients();
+  const { agendaSessoes = [], createAgendaSessao, loading, error } = useAgendaSessoesReal();
+  const { pacientes = [] } = usePacientes();
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  
+
   const [scheduleForm, setScheduleForm] = useState({
     patient: "",
     date: "",
@@ -88,15 +99,40 @@ export function TodaySchedule() {
     notes: ""
   });
 
-  // Filtrar appointments de hoje e combinar com dados dos pacientes
-  const today = new Date().toISOString().split('T')[0];
-  const todayAppointments = appointments
-    .filter(apt => apt.date === today)
-    .map(apt => {
-      const patient = patients.find(p => p.id === apt.patient_id);
+  // Função para formatar data no formato YYYY-MM-DD
+  const formatDateToYYYYMMDD = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Filtrar agendamentos de hoje e combinar com dados dos pacientes
+  const today = formatDateToYYYYMMDD(new Date());
+  
+
+  
+  const todayAppointments = agendaSessoes
+    .filter(sessao => {
+      console.log(`📅 Comparando: sessao.data="${sessao.data}" com today="${today}"`);
+      return sessao.data === today;
+    })
+    .map(sessao => {
+      const paciente = pacientes.find(p => p.id === sessao.pacienteId);
       return {
-        ...apt,
-        patientName: patient?.name || 'Paciente não encontrado'
+        ...sessao,
+        patientName: paciente?.nome || 'Paciente não encontrado',
+        // Mapear status numérico para string para compatibilidade
+        status: sessao.status === 0 ? "agendado" : 
+                sessao.status === 1 ? "em_andamento" :
+                sessao.status === 2 ? "realizado" : "cancelado",
+        // Mapear campos para compatibilidade
+        date: sessao.data,
+        time: sessao.horario,
+        duration: sessao.duracao,
+        type: sessao.tipoDaConsulta,
+        modality: sessao.modalidade,
+        notes: sessao.observacao
       };
     });
   
@@ -107,7 +143,7 @@ export function TodaySchedule() {
     apt => apt.status === "realizado"
   );
 
-  const handleCreateSchedule = () => {
+  const handleCreateSchedule = async () => {
     if (!scheduleForm.patient || !scheduleForm.date || !scheduleForm.time) {
       toast({
         title: "Erro",
@@ -117,22 +153,34 @@ export function TodaySchedule() {
       return;
     }
 
-    createAppointment("temp-patient", {
-      date: scheduleForm.date,
-      time: scheduleForm.time,
-      duration: 50,
-      type: "consulta",
-      modality: "presencial",
-      status: "agendado",
-      notes: scheduleForm.notes
-    });
+    try {
+      await createAgendaSessao({
+        pacienteId: scheduleForm.patient,
+        data: scheduleForm.date,
+        horario: scheduleForm.time,
+        duracao: 50,
+        tipoDaConsulta: "consulta",
+        modalidade: scheduleForm.type,
+        tipoAtendimento: "individual",
+        status: 0, // agendado
+        observacao: scheduleForm.notes,
+        value: 0
+      });
 
-    toast({
-      title: "Sessão agendada!",
-      description: `Sessão marcada para ${scheduleForm.patient} em ${scheduleForm.date} às ${scheduleForm.time}.`
-    });
-    setIsScheduleModalOpen(false);
-    setScheduleForm({ patient: "", date: "", time: "", type: "presencial", notes: "" });
+      toast({
+        title: "Sessão agendada!",
+        description: `Sessão marcada para ${scheduleForm.date} às ${scheduleForm.time}.`
+      });
+      
+      setIsScheduleModalOpen(false);
+      setScheduleForm({ patient: "", date: "", time: "", type: "presencial", notes: "" });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível agendar a sessão. Tente novamente.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -140,15 +188,27 @@ export function TodaySchedule() {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       
       <CardHeader className="relative z-10 pb-4">
-        <CardTitle className="flex items-center gap-3">
-          <div className="rounded-full p-2 bg-primary/10 group-hover:bg-primary/20 transition-colors">
-            <Calendar className="w-5 h-5 text-primary" />
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-full p-2 bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <Calendar className="w-5 h-5 text-primary" />
+            </div>
+            Agenda de Hoje
           </div>
-          Agenda de Hoje
+          <div className="text-sm font-normal text-muted-foreground">
+            {new Date(today).toLocaleDateString('pt-BR')}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 relative z-10">
-        {upcomingAppointments.length > 0 && (
+        {loading && (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-sm text-muted-foreground">Carregando agendamentos...</p>
+          </div>
+        )}
+        
+        {!loading && upcomingAppointments.length > 0 && (
           <div>
             <h4 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Próximas Sessões</h4>
             <div className="space-y-3">
@@ -163,7 +223,7 @@ export function TodaySchedule() {
           </div>
         )}
         
-        {completedAppointments.length > 0 && (
+        {!loading && completedAppointments.length > 0 && (
           <div>
             <h4 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Sessões Realizadas</h4>
             <div className="space-y-3">
@@ -178,7 +238,7 @@ export function TodaySchedule() {
           </div>
         )}
 
-        {todayAppointments.length === 0 && (
+        {!loading && todayAppointments.length === 0 && (
           <div className="text-center py-12 relative z-20">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
               <Calendar className="w-8 h-8 text-primary" />
@@ -205,7 +265,7 @@ export function TodaySchedule() {
           </div>
         )}
 
-        {todayAppointments.length > 0 && (
+        {!loading && todayAppointments.length > 0 && (
           <div className="pt-4 border-t border-border relative z-20">
             <Button 
               variant="outline" 
@@ -233,11 +293,21 @@ export function TodaySchedule() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Paciente *</Label>
-                <Input
-                  placeholder="Nome do paciente"
-                  value={scheduleForm.patient}
-                  onChange={(e) => setScheduleForm({...scheduleForm, patient: e.target.value})}
-                />
+                <Select 
+                  value={scheduleForm.patient} 
+                  onValueChange={(value) => setScheduleForm({...scheduleForm, patient: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um paciente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pacientes.filter(p => p.status === 1).map((paciente) => (
+                      <SelectItem key={paciente.id} value={paciente.id}>
+                        {paciente.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

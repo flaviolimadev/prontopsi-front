@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { apiService } from '@/services/api.service';
 import { useToast } from '@/hooks/use-toast';
 
@@ -342,6 +342,11 @@ export function usePagamentos() {
     const newFilters = { ...filters, page: newPage };
     fetchPagamentos(newFilters);
   }, [filters, fetchPagamentos]);
+
+  // Carregar dados automaticamente quando o hook é montado
+  useEffect(() => {
+    fetchPagamentos();
+  }, [fetchPagamentos]);
 
   return {
     pagamentos,
