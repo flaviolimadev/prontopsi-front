@@ -38,7 +38,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo -e "${YELLOW}🔧 Comandos úteis:${NC}"
     echo "  • Executar localmente:"
-    echo "    docker run -p 3000:80 $FULL_IMAGE_NAME"
+    echo "    docker run -p 8080:80 $FULL_IMAGE_NAME"
     echo ""
     echo "  • Executar com docker-compose:"
     echo "    docker-compose up -d"
@@ -50,5 +50,14 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}🎉 Pronto para deploy!${NC}"
 else
     echo -e "${RED}❌ Erro no build da imagem.${NC}"
+    echo ""
+    echo -e "${YELLOW}💡 Possíveis soluções:${NC}"
+    echo "  1. Execute: ./test-docker-build.sh (para verificar pré-requisitos)"
+    echo "  2. Verifique se Vite está nas devDependencies"
+    echo "  3. Tente build local: npm run build"
+    echo "  4. Se erro 'vite: not found', o Dockerfile foi corrigido"
+    echo ""
+    echo -e "${YELLOW}🔍 Para debug detalhado:${NC}"
+    echo "  docker build -t $FULL_IMAGE_NAME . --no-cache --progress=plain"
     exit 1
 fi

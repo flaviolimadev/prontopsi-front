@@ -10,7 +10,14 @@ Este documento explica como fazer o deploy do frontend ProntuPsi usando Docker, 
 
 ## 🚀 Quick Start
 
-### 1. Build da Imagem
+### 1. Verificar Pré-requisitos
+
+```bash
+# Testar se tudo está pronto para build
+./test-docker-build.sh
+```
+
+### 2. Build da Imagem
 
 ```bash
 # Build simples
@@ -21,6 +28,9 @@ docker build -t prontupsi-frontend:v1.0.0 .
 
 # Usando o script automatizado (Linux/Mac)
 ./build-docker.sh
+
+# Debug detalhado se houver problemas
+docker build -t prontupsi-frontend . --no-cache --progress=plain
 ```
 
 ### 2. Executar Localmente
@@ -173,6 +183,45 @@ location / {
 npm run build
 ls -la dist/
 ```
+
+### ❌ Problema: "vite: not found" durante build
+
+**Sintomas**: Build falha com erro `sh: vite: not found`
+
+**Causa**: Dockerfile estava instalando apenas dependências de produção (`--only=production`), mas o Vite é uma devDependency necessária para o build.
+
+**Solução**: ✅ **JÁ CORRIGIDO** no Dockerfile atual!
+
+```dockerfile
+# ANTES (erro):
+RUN npm ci --only=production --silent
+
+# DEPOIS (correto):
+RUN npm ci --silent
+```
+
+**Verificação**:
+```bash
+# Testar build local
+npm run build
+
+# Verificar se Vite está disponível
+npx vite --version
+
+# Testar pré-requisitos completos
+./test-docker-build.sh
+```
+
+### ❌ Problema: nginx.conf não encontrado
+
+**Sintomas**: Build falha ao copiar nginx.conf
+
+**Solução**: Verificar se o arquivo existe:
+```bash
+ls -la nginx.conf
+```
+
+Se não existir, será criado automaticamente pelo script.
 
 ## 📝 Scripts Disponíveis
 

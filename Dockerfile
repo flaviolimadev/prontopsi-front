@@ -11,8 +11,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY bun.lockb* ./
 
-# Instalar dependências
-RUN npm ci --only=production --silent
+# Instalar dependências (incluindo devDependencies para build)
+RUN npm ci --silent
 
 # Copiar código fonte
 COPY . .
@@ -33,26 +33,14 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copiar configuração customizada do nginx
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# Criar usuário não-root para segurança
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
-
-# Dar permissões apropriadas
-RUN chown -R nextjs:nodejs /usr/share/nginx/html
-RUN chown -R nextjs:nodejs /var/cache/nginx
-RUN chown -R nextjs:nodejs /var/log/nginx
-RUN chown -R nextjs:nodejs /etc/nginx/conf.d
-RUN touch /var/run/nginx.pid
-RUN chown -R nextjs:nodejs /var/run/nginx.pid
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expor porta 80
 EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:80/ || exit 1
+  CMD curl -f http://localhost/health || exit 1
 
 # Comando para iniciar nginx
 CMD ["nginx", "-g", "daemon off;"]
