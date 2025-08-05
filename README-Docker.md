@@ -256,6 +256,39 @@ server {
 grep -E "^(user|worker_processes|events|http)" nginx.conf
 ```
 
+### ❌ Problema: "host not found in upstream backend"
+
+**Sintomas**: Container falha com erro `nginx: [emerg] host not found in upstream "backend" in /etc/nginx/conf.d/default.conf:53`
+
+**Causa**: O nginx.conf estava tentando fazer proxy para um host chamado "backend" que não existe no ambiente do Coolify, onde frontend e backend são containers separados.
+
+**Solução**: ✅ **JÁ CORRIGIDO** no nginx.conf atual!
+
+```nginx
+# ❌ ANTES (erro):
+location /api/ {
+    proxy_pass http://backend:3000/api/;
+    # ... configurações de proxy
+}
+
+# ✅ DEPOIS (correto):
+# API Proxy (comentado para deploy no Coolify)
+# No Coolify, frontend e backend são containers separados
+# location /api/ {
+#     proxy_pass http://backend:3000/api/;
+#     # ... configurações de proxy
+# }
+```
+
+**Verificação**:
+```bash
+# Verificar se não tem proxy ativo
+grep -n "proxy_pass" nginx.conf
+
+# Testar configuração
+./test-nginx.sh
+```
+
 ## 📝 Scripts Disponíveis
 
 ```bash

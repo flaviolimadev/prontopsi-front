@@ -119,6 +119,15 @@ if [ -f "nginx.conf" ]; then
     else
         echo -e "${YELLOW}⚠️  nginx.conf pode precisar de ajustes${NC}"
     fi
+    
+    # Verificar se não tem proxy ativo (para Coolify)
+    if grep -v "^[[:space:]]*#" nginx.conf | grep -q "proxy_pass"; then
+        echo -e "${RED}❌ Proxy ativo encontrado - pode causar erro no Coolify${NC}"
+        echo -e "${YELLOW}   Comente a seção de proxy para deploy no Coolify${NC}"
+        exit 1
+    else
+        echo -e "${GREEN}✅ Nenhum proxy ativo encontrado${NC}"
+    fi
 fi
 
 # Verificar porta disponível

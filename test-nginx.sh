@@ -48,13 +48,22 @@ else
     echo "⚠️  Health check não encontrado"
 fi
 
-# Verificar se tem SPA fallback
-if grep -q "try_files.*index.html" nginx.conf; then
-    echo "✅ SPA fallback configurado"
-else
-    echo "❌ SPA fallback não encontrado"
-    exit 1
-fi
+       # Verificar se tem SPA fallback
+       if grep -q "try_files.*index.html" nginx.conf; then
+           echo "✅ SPA fallback configurado"
+       else
+           echo "❌ SPA fallback não encontrado"
+           exit 1
+       fi
+
+       # Verificar se não tem proxy ativo (para Coolify)
+       if grep -v "^[[:space:]]*#" nginx.conf | grep -q "proxy_pass"; then
+           echo "❌ Proxy ativo encontrado - pode causar erro no Coolify"
+           echo "   Comente a seção de proxy para deploy no Coolify"
+           exit 1
+       else
+           echo "✅ Nenhum proxy ativo encontrado"
+       fi
 
 echo ""
 echo "🎉 Configuração do nginx parece estar correta!"
