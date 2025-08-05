@@ -38,7 +38,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo -e "${YELLOW}🔧 Comandos úteis:${NC}"
     echo "  • Executar localmente:"
-    echo "    docker run -p 8080:80 $FULL_IMAGE_NAME"
+    echo "    docker run -p 87:87 $FULL_IMAGE_NAME"
     echo ""
     echo "  • Executar com docker-compose:"
     echo "    docker-compose up -d"

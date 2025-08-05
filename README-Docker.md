@@ -36,11 +36,11 @@ docker build -t prontupsi-frontend . --no-cache --progress=plain
 ### 2. Executar Localmente
 
 ```bash
-# Executar na porta 3000
-docker run -p 3000:80 prontupsi-frontend
+# Executar na porta 87
+docker run -p 87:87 prontupsi-frontend
 
 # Executar em background
-docker run -d -p 3000:80 --name prontupsi-frontend prontupsi-frontend
+docker run -d -p 87:87 --name prontupsi-frontend prontupsi-frontend
 
 # Com docker-compose
 docker-compose up -d
@@ -49,7 +49,7 @@ docker-compose up -d
 ### 3. Acessar a Aplicação
 
 ```
-http://localhost:3000
+http://localhost:87
 ```
 
 ## 🔧 Configuração para Produção
@@ -139,10 +139,10 @@ A aplicação inclui endpoints para monitoramento:
 
 ```bash
 # Health check
-curl http://localhost:3000/health
+curl http://localhost:87/health
 
 # Nginx status
-curl http://localhost:3000/nginx_status
+curl http://localhost:87/nginx_status
 ```
 
 ## 📊 Otimizações Incluídas
@@ -223,6 +223,39 @@ ls -la nginx.conf
 
 Se não existir, será criado automaticamente pelo script.
 
+### ❌ Problema: "user directive is not allowed here"
+
+**Sintomas**: Container falha com erro `nginx: [emerg] "user" directive is not allowed here in /etc/nginx/conf.d/default.conf:2`
+
+**Causa**: O arquivo nginx.conf estava configurado como configuração principal do nginx (com `user`, `worker_processes`, `events`, `http`), mas estava sendo copiado para `/etc/nginx/conf.d/default.conf`, que é para configurações de servidor individuais.
+
+**Solução**: ✅ **JÁ CORRIGIDO** no nginx.conf atual!
+
+```nginx
+# ❌ ANTES (erro):
+user nextjs;
+worker_processes auto;
+events { ... }
+http {
+    server { ... }
+}
+
+# ✅ DEPOIS (correto):
+server {
+    listen 80;
+    # ... configuração do servidor
+}
+```
+
+**Verificação**:
+```bash
+# Testar configuração
+./test-nginx.sh
+
+# Verificar se não tem diretivas proibidas
+grep -E "^(user|worker_processes|events|http)" nginx.conf
+```
+
 ## 📝 Scripts Disponíveis
 
 ```bash
@@ -241,8 +274,8 @@ npm run test
 
 ## 🔗 URLs Importantes
 
-- **Aplicação**: `http://localhost:3000`
-- **Health Check**: `http://localhost:3000/health`
+- **Aplicação**: `http://localhost:87`
+- **Health Check**: `http://localhost:87/health`
 - **Logs**: `docker logs prontupsi-frontend`
 
 ## 📞 Suporte

@@ -74,6 +74,21 @@ fi
 
 echo -e "${GREEN}✅ Vite está funcionando${NC}"
 
+# Verificar configuração do nginx
+echo -e "${YELLOW}🔧 Verificando configuração do nginx...${NC}"
+if grep -q "^user " nginx.conf || grep -q "^worker_processes" nginx.conf || grep -q "^events {" nginx.conf || grep -q "^http {" nginx.conf; then
+    echo -e "${RED}❌ nginx.conf tem diretivas proibidas para conf.d/${NC}"
+    echo -e "${YELLOW}   O arquivo deve conter apenas o bloco 'server'${NC}"
+    exit 1
+fi
+
+if ! grep -q "^server {" nginx.conf; then
+    echo -e "${RED}❌ nginx.conf não tem bloco 'server'${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ nginx.conf configurado corretamente${NC}"
+
 # Teste de build local
 echo -e "${YELLOW}🔨 Testando build local...${NC}"
 if npm run build > /dev/null 2>&1; then
@@ -110,7 +125,7 @@ fi
 if command -v netstat &> /dev/null; then
     if netstat -an | grep -q ":80"; then
         echo -e "${YELLOW}⚠️  Porta 80 está em uso${NC}"
-        echo -e "${YELLOW}   Use docker run -p 8080:80 para mapear para porta 8080${NC}"
+        echo -e "${YELLOW}   Use docker run -p 87:87 para mapear para porta 87${NC}"
     else
         echo -e "${GREEN}✅ Porta 80 disponível${NC}"
     fi
@@ -123,7 +138,7 @@ echo -e "${YELLOW}💡 Para fazer o build Docker, execute:${NC}"
 echo "   docker build -t prontupsi-frontend ."
 echo ""
 echo -e "${YELLOW}💡 Para executar o container:${NC}"
-echo "   docker run -p 8080:80 prontupsi-frontend"
+echo "   docker run -p 87:87 prontupsi-frontend"
 echo ""
 echo -e "${YELLOW}💡 Para testar localmente com compose:${NC}"
 echo "   docker-compose up --build"
