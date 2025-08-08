@@ -21,7 +21,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Palette
 } from 'lucide-react';
 import { Paciente } from '@/hooks/usePacientes';
 import { EditPacienteModal } from './EditPacienteModal';
@@ -36,6 +37,7 @@ interface PacientesTableProps {
   onStatusFilter: (status: number | undefined) => void;
   onPageChange: (page: number) => void;
   onEdit: (paciente: Paciente) => void;
+  onUpdateColor: (id: string, cor: string) => void;
   onDelete: (id: string) => void;
   onDeactivate: (id: string) => void;
   onReactivate: (id: string) => void;
@@ -51,6 +53,7 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
   onStatusFilter,
   onPageChange,
   onEdit,
+  onUpdateColor,
   onDelete,
   onDeactivate,
   onReactivate
@@ -59,6 +62,10 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
+  const [colorModalOpen, setColorModalOpen] = useState(false);
+  const [selectedPacienteForColor, setSelectedPacienteForColor] = useState<Paciente | null>(null);
+  const [newColor, setNewColor] = useState('#3B82F6');
+  const [updatingColor, setUpdatingColor] = useState(false);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
@@ -98,13 +105,17 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
   };
 
   const handleEditSubmit = async (data: any) => {
-    if (selectedPaciente) {
-      await onEdit({ ...selectedPaciente, ...data });
+    try {
+      await onEdit(data);
+      setEditModalOpen(false);
+      setSelectedPaciente(null);
+    } catch (error) {
+      console.error('Erro ao editar paciente:', error);
     }
   };
 
   const handleDeletePaciente = async (id: string) => {
-    if (confirm('Tem certeza que deseja deletar este paciente?')) {
+    if (window.confirm('Tem certeza que deseja excluir este paciente?')) {
       await onDelete(id);
     }
   };
@@ -114,6 +125,28 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
       await onDeactivate(paciente.id);
     } else {
       await onReactivate(paciente.id);
+    }
+  };
+
+  const handleColorChange = (paciente: Paciente) => {
+    setSelectedPacienteForColor(paciente);
+    setNewColor(paciente.cor || '#3B82F6');
+    setColorModalOpen(true);
+  };
+
+  const handleColorSubmit = async () => {
+    if (!selectedPacienteForColor) return;
+    
+    setUpdatingColor(true);
+    try {
+      await onUpdateColor(selectedPacienteForColor.id, newColor);
+      setColorModalOpen(false);
+      setSelectedPacienteForColor(null);
+      setNewColor('#3B82F6');
+    } catch (error) {
+      console.error('Erro ao atualizar cor do paciente:', error);
+    } finally {
+      setUpdatingColor(false);
     }
   };
 
@@ -187,11 +220,23 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
                   pacientes.map((paciente) => (
                     <TableRow key={paciente.id}>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{paciente.nome}</div>
-                          {paciente.profissao && (
-                            <div className="text-sm text-gray-500">{paciente.profissao}</div>
-                          )}
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleColorChange(paciente)}
+                            className="p-1 h-8 w-8 rounded-full border-2 border-gray-300 hover:border-gray-400 transition-colors"
+                            style={{ backgroundColor: paciente.cor || '#3B82F6' }}
+                            title={`Alterar cor do paciente ${paciente.nome}`}
+                          >
+                            <Palette className="w-3 h-3 text-white" />
+                          </Button>
+                          <div>
+                            <div className="font-medium">{paciente.nome}</div>
+                            {paciente.profissao && (
+                              <div className="text-sm text-gray-500">{paciente.profissao}</div>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -324,6 +369,42 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
           onSubmit={handleEditSubmit}
           loading={loading}
         />
+      )}
+
+      {/* Modal de Cor */}
+      {selectedPacienteForColor && (
+        <Dialog open={colorModalOpen} onOpenChange={setColorModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Alterar Cor do Paciente</DialogTitle>
+              <DialogDescription>
+                Selecione uma nova cor para o paciente {selectedPacienteForColor.nome}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center justify-center gap-2 py-4">
+              <input
+                type="color"
+                value={newColor}
+                onChange={(e) => setNewColor(e.target.value)}
+                className="w-10 h-10 border-2 border-gray-300 rounded-md cursor-pointer"
+              />
+              <span className="text-lg font-semibold">{newColor}</span>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setColorModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleColorSubmit} disabled={updatingColor}>
+                {updatingColor ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Palette className="mr-2 h-4 w-4" />
+                )}
+                {updatingColor ? 'Atualizando...' : 'Atualizar Cor'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

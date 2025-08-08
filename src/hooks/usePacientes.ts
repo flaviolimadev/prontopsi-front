@@ -18,6 +18,7 @@ export interface Paciente {
   contatos_emergencia: Array<{id: string, nome: string, telefone: string}> | null;
   medicacoes: any[] | null;
   status: number;
+  cor: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -143,6 +144,38 @@ export const usePacientes = () => {
     } catch (err: any) {
       console.error('Erro ao atualizar paciente:', err);
       const errorMessage = err.response?.data?.message || 'Erro ao atualizar paciente';
+      toast({
+        title: 'Erro',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Atualizar cor do paciente
+  const updatePacienteColor = async (id: string, cor: string) => {
+    try {
+      setLoading(true);
+      const updatedPaciente = await apiService.updatePacienteColor(id, cor);
+      
+      setPacientes(prev => 
+        prev.map(paciente => 
+          paciente.id === id ? updatedPaciente : paciente
+        )
+      );
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Cor do paciente atualizada com sucesso!',
+      });
+
+      return updatedPaciente;
+    } catch (err: any) {
+      console.error('Erro ao atualizar cor do paciente:', err);
+      const errorMessage = err.response?.data?.message || 'Erro ao atualizar cor do paciente';
       toast({
         title: 'Erro',
         description: errorMessage,
@@ -340,6 +373,7 @@ export const usePacientes = () => {
     getPaciente,
     createPaciente,
     updatePaciente,
+    updatePacienteColor,
     deletePaciente,
     deactivatePaciente,
     reactivatePaciente,

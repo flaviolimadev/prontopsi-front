@@ -35,7 +35,8 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
     observacao_geral: '',
     contato_emergencia: '',
     medicacoes: [],
-    status: 0
+    status: 0,
+    cor: '#3B82F6'
   });
 
   useEffect(() => {
@@ -52,7 +53,8 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
         observacao_geral: paciente.observacao_geral || '',
         contato_emergencia: paciente.contato_emergencia || '',
         medicacoes: paciente.medicacoes || [],
-        status: paciente.status
+        status: paciente.status,
+        cor: paciente.cor || '#3B82F6'
       });
     }
   }, [paciente, mode]);
@@ -81,7 +83,8 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
         observacao_geral: '',
         contato_emergencia: '',
         medicacoes: [],
-        status: 0
+        status: 0,
+        cor: '#3B82F6'
       });
     } catch (error) {
       console.error('Erro ao salvar paciente:', error);
@@ -270,6 +273,29 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Cor */}
+                <div>
+                  <Label htmlFor="cor">Cor de Identificação</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id="cor"
+                      type="color"
+                      value={formData.cor}
+                      onChange={(e) => handleInputChange('cor', e.target.value)}
+                      className="w-16 h-10 p-1 border rounded"
+                    />
+                    <Input
+                      value={formData.cor}
+                      onChange={(e) => handleInputChange('cor', e.target.value)}
+                      placeholder="#3B82F6"
+                      className="flex-1"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Escolha uma cor para identificar o paciente na agenda
+                  </p>
+                </div>
              </div>
            ) : (
              // Formulário completo para edição
@@ -372,6 +398,29 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
                        <SelectItem value="1">Ativo</SelectItem>
                      </SelectContent>
                    </Select>
+                 </div>
+
+                 {/* Cor */}
+                 <div>
+                   <Label htmlFor="cor">Cor de Identificação</Label>
+                   <div className="flex items-center space-x-2">
+                     <Input
+                       id="cor"
+                       type="color"
+                       value={formData.cor}
+                       onChange={(e) => handleInputChange('cor', e.target.value)}
+                       className="w-16 h-10 p-1 border rounded"
+                     />
+                     <Input
+                       value={formData.cor}
+                       onChange={(e) => handleInputChange('cor', e.target.value)}
+                       placeholder="#3B82F6"
+                       className="flex-1"
+                     />
+                   </div>
+                   <p className="text-xs text-muted-foreground mt-1">
+                     Escolha uma cor para identificar o paciente na agenda
+                   </p>
                  </div>
                </div>
 

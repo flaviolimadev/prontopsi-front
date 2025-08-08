@@ -350,6 +350,11 @@ class ApiService {
     return this.put<any>(`/pacientes/${id}`, pacienteData);
   }
 
+  // Atualizar cor do paciente
+  async updatePacienteColor(id: string, cor: string) {
+    return this.put<any>(`/pacientes/${id}/color`, { cor });
+  }
+
   // Deletar paciente
   async deletePaciente(id: string) {
     return this.delete<any>(`/pacientes/${id}`);
@@ -410,6 +415,11 @@ class ApiService {
   // Atualizar sessão
   async updateAgendaSessao(id: string, sessaoData: any) {
     return this.patch<any>(`/agenda-sessoes/${id}`, sessaoData);
+  }
+
+  // Atualizar registro de sessão (observações)
+  async updateSessionRecord(id: string, observacao: string) {
+    return this.patch<any>(`/agenda-sessoes/${id}`, { observacao });
   }
 
   // Deletar sessão

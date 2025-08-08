@@ -28,6 +28,7 @@ export default function Pacientes() {
     totalPages,
     createPaciente,
     updatePaciente,
+    updatePacienteColor,
     deletePaciente,
     deactivatePaciente,
     reactivatePaciente,
@@ -182,6 +183,7 @@ export default function Pacientes() {
         onStatusFilter={handleStatusFilter}
         onPageChange={handlePageChange}
         onEdit={handleUpdatePaciente}
+        onUpdateColor={updatePacienteColor}
         onDelete={handleDeletePaciente}
         onDeactivate={handleDeactivatePaciente}
         onReactivate={handleReactivatePaciente}

@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Users, CreditCard, TrendingUp, TrendingDown } from 'lucide-react';
+import { Calendar, Users, CreditCard, TrendingUp, TrendingDown, CheckCircle } from 'lucide-react';
 import { usePatients } from '@/hooks/usePatients';
 import { useAppointments } from '@/hooks/useAppointments';
 import { usePagamentos } from '@/hooks/usePagamentos';
@@ -83,10 +83,10 @@ export function DashboardStats() {
           icon: CreditCard,
         },
         {
-          title: "Previsão 7 dias",
-          value: "R$ 0,00",
+          title: "Atendimentos concluídos",
+          value: "0",
           description: "Carregando...",
-          icon: TrendingUp,
+          icon: CheckCircle,
         },
       ];
     }
@@ -107,15 +107,9 @@ export function DashboardStats() {
     });
     const totalRevenue30Days = recent30DaysPayments.reduce((sum, p) => sum + Number(p.value || 0), 0);
     
-    // 4. PREVISÃO SEMANAL - Total que vai receber na semana se pendentes forem pagos
-    const oneWeekFromNow = new Date();
-    oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
-    
-    const weeklyPendingPayments = pagamentos.filter(p => {
-      const paymentDate = new Date(p.data);
-      return paymentDate <= oneWeekFromNow && p.status === 0; // Pendentes na próxima semana
-    });
-    const weeklyForecast = weeklyPendingPayments.reduce((sum, p) => sum + Number(p.value || 0), 0);
+    // 4. ATENDIMENTOS CONCLUÍDOS - Total de sessões marcadas como realizadas
+    const completedAppointments = appointments.filter(apt => apt.status === "realizado");
+    const totalCompleted = completedAppointments.length;
 
     return [
       {
@@ -145,14 +139,12 @@ export function DashboardStats() {
         icon: CreditCard,
       },
       {
-        title: "Previsão 7 dias",
-        value: isFinancialVisible 
-          ? `R$ ${weeklyForecast.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-          : "••••••••",
-        description: weeklyPendingPayments.length === 0 
-          ? "Nenhum pendente" 
-          : `${weeklyPendingPayments.length} pendentes`,
-        icon: TrendingUp,
+        title: "Atendimentos concluídos",
+        value: totalCompleted.toString(),
+        description: totalCompleted === 0 
+          ? "Nenhum atendimento" 
+          : `${totalCompleted} realizadas`,
+        icon: CheckCircle,
       },
     ];
   }, [patients, appointments, pagamentos]);

@@ -89,6 +89,7 @@ import {
 
 import { usePacientes } from "@/hooks/usePacientes";
 import { PacienteForm } from "@/components/pacientes/PacienteForm";
+import { SessionRecordModal } from "@/components/pacientes/SessionRecordModal";
 import { apiService } from "@/services/api.service";
 import { useAgendaSessoesReal } from "@/hooks/useAgendaSessoesReal";
 import { usePagamentos } from "@/hooks/usePagamentos";
@@ -111,6 +112,8 @@ export default function PatientProfile() {
   const [isMedicationModalOpen, setIsMedicationModalOpen] = useState(false);
   const [isEmergencyContactModalOpen, setIsEmergencyContactModalOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+  const [isSessionRecordModalOpen, setIsSessionRecordModalOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
   const [medications, setMedications] = useState<Array<{id: string, nome: string, prescricao: string}>>([]);
   const [emergencyContacts, setEmergencyContacts] = useState<Array<{id: string, nome: string, telefone: string}>>([]);
   const [newMedication, setNewMedication] = useState({ nome: '', prescricao: '' });
@@ -655,6 +658,39 @@ export default function PatientProfile() {
     }
   };
 
+  const handleEditSessionRecord = (session: any) => {
+    setSelectedSession(session);
+    setIsSessionRecordModalOpen(true);
+  };
+
+  const handleSaveSessionRecord = async (sessionId: string, observacao: string) => {
+    try {
+      await apiService.updateSessionRecord(sessionId, observacao);
+      
+      // Atualizar a sessão na lista local
+      setPatientAppointments(prev => 
+        prev.map(session => 
+          session.id === sessionId 
+            ? { ...session, observacao, notes: observacao } 
+            : session
+        )
+      );
+      
+      toast({
+        title: "Sucesso",
+        description: "Registro da sessão salvo com sucesso!",
+      });
+    } catch (error: any) {
+      console.error('Erro ao salvar registro da sessão:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar registro da sessão.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
   const calculateAge = (birthDate: string) => {
     const birth = new Date(birthDate);
     const today = new Date();
@@ -1193,6 +1229,7 @@ export default function PatientProfile() {
                           <TableHead>Status</TableHead>
                           <TableHead>Valor</TableHead>
                           <TableHead>Observações</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1233,6 +1270,17 @@ export default function PatientProfile() {
                             </TableCell>
                             <TableCell className="max-w-xs truncate">
                               {appointment.notes || "-"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditSessionRecord(appointment)}
+                                className="h-8 px-2"
+                              >
+                                <FileText className="w-4 h-4 mr-1" />
+                                Editar Registro
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1812,6 +1860,15 @@ export default function PatientProfile() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Modal de Registro de Sessão */}
+        <SessionRecordModal
+          session={selectedSession}
+          open={isSessionRecordModalOpen}
+          onOpenChange={setIsSessionRecordModalOpen}
+          onSave={handleSaveSessionRecord}
+          loading={actionLoading}
+        />
       </div>
     </div>
   );

@@ -34,7 +34,10 @@ import {
   Trash2,
   Check,
   ExternalLink,
-  Loader2
+  Loader2,
+  Sparkles,
+  Mail,
+  MessageCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications, Notification } from '@/hooks/useNotifications';
@@ -285,9 +288,29 @@ export function Header() {
                 <User className="mr-2 h-4 w-4" />
                 <span>Meu Perfil</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/configuracoes')}>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Configurações</span>
+              <DropdownMenuItem onClick={() => navigate('/relatorios')}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                <span>Agentes IA</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => {
+                  const subject = 'Suporte - ProntuPsi';
+                  const body = 'Olá, preciso de ajuda com o ProntuPsi.';
+                  window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+                }}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                <span>Suporte (Email)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  const text = 'Olá, preciso de suporte no ProntuPsi.';
+                  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+              >
+                <MessageCircle className="mr-2 h-4 w-4" />
+                <span>Suporte (WhatsApp)</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-red-600 dark:text-red-400">

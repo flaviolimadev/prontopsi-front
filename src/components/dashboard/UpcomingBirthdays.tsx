@@ -50,7 +50,7 @@ export function UpcomingBirthdays() {
         };
       })
       .sort((a, b) => a.daysUntil - b.daysUntil)
-      .slice(0, 4);
+      .slice(0, 5);
 
     return patientsWithBirthdays;
   }, [patients]);

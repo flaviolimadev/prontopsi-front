@@ -39,7 +39,7 @@ const navigation = [
   { name: "Prontuários", href: "/prontuarios", icon: FileText, description: "Prontuários psicológicos" },
   { name: "Financeiro", href: "/financeiro", icon: Wallet, description: "Controle financeiro" },
   { name: "Arquivos", href: "/arquivos", icon: MessageSquare, description: "Documentos" },
-  { name: "Relatórios", href: "/relatorios", icon: FileText, description: "Análises" },
+  { name: "Agentes IA", href: "/relatorios", icon: Sparkles, description: "Assistentes inteligentes" },
   { name: "Configurações", href: "/configuracoes", icon: Settings, description: "Preferências" },
 ];
 

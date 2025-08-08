@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { DollarSign, Plus, TrendingUp, Calendar, Download, User, CreditCard, CalendarIcon, Package, Edit, Trash2, Power, PowerOff, RefreshCw, ChevronDown, ChevronUp, Filter, X } from "lucide-react";
 import { format } from "date-fns";
 import { usePatients } from "@/hooks/usePatients";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,8 @@ export default function Financeiro() {
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const [filteredPagamentos, setFilteredPagamentos] = useState<any[]>([]);
   const [isFiltered, setIsFiltered] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(5);
   const { toast } = useToast();
   const { isFinancialVisible } = useFinancialVisibility();
 
@@ -53,13 +56,14 @@ export default function Financeiro() {
       return;
     }
 
-    const filtered = pagamentos.filter(pagamento => {
+    const filtered = (pagamentos || []).filter(pagamento => {
       const paymentDate = new Date(pagamento.data);
       return paymentDate >= startDate && paymentDate <= endDate;
     });
 
     setFilteredPagamentos(filtered);
     setIsFiltered(true);
+    setCurrentPage(1); // Resetar para primeira página
     
     toast({
       title: "Filtro Aplicado",
@@ -71,6 +75,7 @@ export default function Financeiro() {
   const clearDateFilter = () => {
     setFilteredPagamentos([]);
     setIsFiltered(false);
+    setCurrentPage(1); // Resetar para primeira página
     
     toast({
       title: "Filtro Limpo",
@@ -78,8 +83,34 @@ export default function Financeiro() {
     });
   };
 
-  // Dados a serem exibidos (filtrados ou todos)
-  const displayPagamentos = isFiltered ? filteredPagamentos : pagamentos;
+  // Dados a serem exibidos (filtrados ou todos) - ordenados por vencimento mais recente
+  const { sortedPagamentos, totalPages, startIndex, endIndex, displayPagamentos } = useMemo(() => {
+    const dataToSort = isFiltered ? filteredPagamentos : (pagamentos || []);
+    
+    const sorted = dataToSort.sort((a, b) => {
+      const dateA = new Date(a.vencimento || a.data);
+      const dateB = new Date(b.vencimento || b.data);
+      return dateB.getTime() - dateA.getTime(); // Ordem decrescente (mais recente primeiro)
+    });
+
+    const total = Math.ceil(sorted.length / itemsPerPage);
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const display = sorted.slice(start, end);
+
+    return {
+      sortedPagamentos: sorted,
+      totalPages: total,
+      startIndex: start,
+      endIndex: end,
+      displayPagamentos: display
+    };
+  }, [isFiltered, filteredPagamentos, pagamentos, currentPage, itemsPerPage]);
+
+  // Função para mudar de página
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
   
   // Estados para o combobox de pacientes
   const [patientComboOpen, setPatientComboOpen] = useState(false);
@@ -101,7 +132,7 @@ export default function Financeiro() {
     const currentYear = now.getFullYear();
 
     // Filtrar pagamentos do mês atual
-    const currentMonthPayments = pagamentos.filter(pagamento => {
+    const currentMonthPayments = (pagamentos || []).filter(pagamento => {
       const paymentDate = new Date(pagamento.data);
       return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
     });
@@ -158,7 +189,8 @@ export default function Financeiro() {
     value: '',
     descricao: '',
     type: null,
-    txid: ''
+    txid: '',
+    fiscalIssued: false
   });
 
   const [newPaymentForm, setNewPaymentForm] = useState({
@@ -168,6 +200,59 @@ export default function Financeiro() {
     session: "",
     date: formatDateToYYYYMMDD(new Date())
   });
+
+  // Controle local: nota fiscal/recibo emitido por pagamento
+  const [fiscalIssuedMap, setFiscalIssuedMap] = useState<Record<string, { recibo: boolean; notaFiscal: boolean }>>({});
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pagamentos_fiscal_issued') || '{}');
+      // Garante chaves existentes
+      const map: Record<string, { recibo: boolean; notaFiscal: boolean }> = { ...stored };
+      (pagamentos || []).forEach(p => {
+        if (map[p.id] === undefined) map[p.id] = { recibo: false, notaFiscal: false };
+        // Migração de formato antigo (boolean) para novo (objeto)
+        if (typeof map[p.id] === 'boolean') {
+          map[p.id] = { recibo: map[p.id] as boolean, notaFiscal: false };
+        }
+      });
+      setFiscalIssuedMap(map);
+      localStorage.setItem('pagamentos_fiscal_issued', JSON.stringify(map));
+    } catch {
+      setFiscalIssuedMap({});
+    }
+  }, [pagamentos]);
+
+  const isReciboIssued = (id: string) => !!fiscalIssuedMap[id]?.recibo;
+  const isNotaFiscalIssued = (id: string) => !!fiscalIssuedMap[id]?.notaFiscal;
+
+  const handleToggleRecibo = (id: string, value: boolean) => {
+    setFiscalIssuedMap(prev => {
+      const next = { 
+        ...prev, 
+        [id]: { 
+          ...(prev[id] || { recibo: false, notaFiscal: false }), 
+          recibo: value 
+        } 
+      };
+      try { localStorage.setItem('pagamentos_fiscal_issued', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const handleToggleNotaFiscal = (id: string, value: boolean) => {
+    setFiscalIssuedMap(prev => {
+      const next = { 
+        ...prev, 
+        [id]: { 
+          ...(prev[id] || { recibo: false, notaFiscal: false }), 
+          notaFiscal: value 
+        } 
+      };
+      try { localStorage.setItem('pagamentos_fiscal_issued', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   const [quickPaymentForm, setQuickPaymentForm] = useState({
     patient: "",
@@ -441,7 +526,7 @@ export default function Financeiro() {
     }
 
     try {
-      await createPagamento({
+      const created = await createPagamento({
         pacienteId: pagamentoForm.pacienteId,
         pacoteId: pagamentoForm.pacoteId || null,
         data: pagamentoForm.data,
@@ -452,6 +537,17 @@ export default function Financeiro() {
         txid: pagamentoForm.txid || undefined
       });
 
+      // Persistir controle local (se houver ID retornado)
+      try {
+        const mapKey = 'pagamentos_fiscal_issued';
+        const currentMap = JSON.parse(localStorage.getItem(mapKey) || '{}');
+        const createdId = (created && (created.id || created?.data?.id)) || null;
+        if (createdId) {
+          currentMap[createdId] = !!pagamentoForm.fiscalIssued;
+          localStorage.setItem(mapKey, JSON.stringify(currentMap));
+        }
+      } catch {}
+
       setIsPaymentModalOpen(false);
       setPagamentoForm({
         pacienteId: '',
@@ -461,7 +557,8 @@ export default function Financeiro() {
         value: '',
         descricao: '',
         type: null,
-        txid: ''
+        txid: '',
+        fiscalIssued: false
       });
     } catch (error) {
       // Erro já tratado no hook
@@ -470,6 +567,12 @@ export default function Financeiro() {
 
   const handleEditPagamento = (pagamento: any) => {
     setSelectedPagamento(pagamento);
+    // Ler controle local de fiscalIssued
+    let fiscalIssuedLocal = false;
+    try {
+      const map = JSON.parse(localStorage.getItem('pagamentos_fiscal_issued') || '{}');
+      fiscalIssuedLocal = !!map[pagamento.id];
+    } catch {}
     setPagamentoForm({
       pacienteId: pagamento.pacienteId,
       pacoteId: pagamento.pacoteId || '',
@@ -482,7 +585,8 @@ export default function Financeiro() {
       }).format(pagamento.value),
       descricao: pagamento.descricao || '',
       type: pagamento.type || null,
-      txid: pagamento.txid || ''
+      txid: pagamento.txid || '',
+      fiscalIssued: fiscalIssuedLocal
     });
     setIsEditPagamentoModalOpen(true);
   };
@@ -509,6 +613,16 @@ export default function Financeiro() {
         txid: pagamentoForm.txid || undefined
       });
 
+      // Persistir controle local do fiscalIssued
+      try {
+        const mapKey = 'pagamentos_fiscal_issued';
+        const currentMap = JSON.parse(localStorage.getItem(mapKey) || '{}');
+        if (selectedPagamento?.id) {
+          currentMap[selectedPagamento.id] = !!pagamentoForm.fiscalIssued;
+          localStorage.setItem(mapKey, JSON.stringify(currentMap));
+        }
+      } catch {}
+
       setIsEditPagamentoModalOpen(false);
       setSelectedPagamento(null);
       setPagamentoForm({
@@ -519,7 +633,8 @@ export default function Financeiro() {
         value: '',
         descricao: '',
         type: null,
-        txid: ''
+        txid: '',
+        fiscalIssued: false
       });
     } catch (error) {
       // Erro já tratado no hook
@@ -1684,8 +1799,8 @@ export default function Financeiro() {
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 {isFiltered 
-                  ? `Exibindo ${displayPagamentos.length} pagamentos do período selecionado`
-                  : "Gerencie todos os pagamentos dos seus pacientes"
+                  ? `Exibindo ${displayPagamentos.length} de ${sortedPagamentos.length} pagamentos do período selecionado`
+                  : `Exibindo ${displayPagamentos.length} de ${sortedPagamentos.length} pagamentos (ordenados por vencimento mais recente)`
                 }
               </p>
             </div>
@@ -1846,6 +1961,7 @@ export default function Financeiro() {
               )}
             </div>
           ) : (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1895,7 +2011,22 @@ export default function Financeiro() {
                       {getTypeLabel(pagamento.type)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-3 items-center">
+                        {/* Controle local: Nota fiscal/recibo emitido */}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>Recibo?</span>
+                          <Switch
+                            checked={isReciboIssued(pagamento.id)}
+                            onCheckedChange={(checked) => handleToggleRecibo(pagamento.id, checked)}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>N.Fiscal?</span>
+                          <Switch
+                            checked={isNotaFiscalIssued(pagamento.id)}
+                            onCheckedChange={(checked) => handleToggleNotaFiscal(pagamento.id, checked)}
+                          />
+                        </div>
                         {pagamento.status === 0 && (
                           <Button 
                             size="sm" 
@@ -1926,6 +2057,78 @@ export default function Financeiro() {
                 ))}
               </TableBody>
             </Table>
+            
+            {/* Paginação */}
+            {totalPages > 0 && (
+              <div className="flex items-center justify-between mt-6">
+                <div className="text-sm text-muted-foreground flex items-center gap-3">
+                  <span>
+                    Mostrando {startIndex + 1} a {Math.min(endIndex, sortedPagamentos.length)} de {sortedPagamentos.length} pagamentos
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span>Itens por página:</span>
+                    <Select value={String(itemsPerPage)} onValueChange={(v) => { setItemsPerPage(parseInt(v)); setCurrentPage(1); }}>
+                      <SelectTrigger className="h-8 w-[90px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Anterior
+                  </Button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNumber;
+                      if (totalPages <= 5) {
+                        pageNumber = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNumber = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNumber = totalPages - 4 + i;
+                      } else {
+                        pageNumber = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNumber}
+                          variant={currentPage === pageNumber ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNumber)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNumber}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Próxima
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -2021,6 +2224,20 @@ export default function Financeiro() {
                 onChange={(e) => setPagamentoForm({...pagamentoForm, descricao: e.target.value})}
                 rows={2}
               />
+            </div>
+            <div className="grid grid-cols-2 gap-4 items-center">
+              <div className="space-y-1">
+                <Label>Nota fiscal ou recibo emitido?</Label>
+                <p className="text-xs text-muted-foreground">Somente controle do psicólogo</p>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <span className="text-sm">Não</span>
+                <Switch
+                  checked={pagamentoForm.fiscalIssued}
+                  onCheckedChange={(checked) => setPagamentoForm({...pagamentoForm, fiscalIssued: checked})}
+                />
+                <span className="text-sm">Sim</span>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

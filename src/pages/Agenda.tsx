@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ interface AppointmentFormData {
   pacoteId?: string | null;
   valorAvulso?: number;
   tipoPagamento?: 'pacote' | 'avulso';
+  patientColor?: string | null;
 }
 
 interface RecurringAppointmentData {
@@ -90,9 +92,13 @@ export default function Agenda() {
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [currentWeek, setCurrentWeek] = useState<Date>(new Date()); // New
+  const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily'); // New
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<any>(null);
+  const [draggedAppointment, setDraggedAppointment] = useState<any>(null); // New
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null); // New
   
   // Estados para modais de pagamento
   const [isPagamentoModalOpen, setIsPagamentoModalOpen] = useState(false);
@@ -214,6 +220,7 @@ export default function Agenda() {
         return {
           ...sessao,
           patientName: paciente?.nome || sessao.paciente?.nome || 'Paciente não encontrado',
+          patientColor: paciente?.cor || null,
           time: sessao.horario,
           date: sessao.data,
           patient_id: sessao.pacienteId,
@@ -265,6 +272,97 @@ export default function Agenda() {
 
     loadPagamentosForVisible();
   }, [dayAppointments, agendaPagamentos, fetchPagamentosByAgendaSessao]);
+
+  // Funções para visualização semanal
+  const getWeekDays = (startDate: Date) => {
+    const days = [];
+    const start = new Date(startDate);
+    start.setDate(start.getDate() - start.getDay()); // Começar no domingo
+    
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(start);
+      day.setDate(start.getDate() + i);
+      days.push(day);
+    }
+    return days;
+  };
+
+  const weekDays = useMemo(() => getWeekDays(currentWeek), [currentWeek]);
+
+  const getAppointmentsForWeek = () => {
+    const weekAppointments: { [key: string]: any[] } = {};
+    
+    weekDays.forEach(day => {
+      const dateStr = formatDateToYYYYMMDD(day);
+      weekAppointments[dateStr] = filteredAgendaSessoes.filter(sessao => sessao.data === dateStr);
+    });
+    
+    return weekAppointments;
+  };
+
+  const weekAppointments = useMemo(() => getAppointmentsForWeek(), [weekDays, filteredAgendaSessoes]);
+
+  // Funções para drag and drop
+  const handleDragStart = (e: React.DragEvent, appointment: any) => {
+    setDraggedAppointment(appointment);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, date: string) => {
+    e.preventDefault();
+    setDragOverDate(date);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverDate(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetDate: string) => {
+    e.preventDefault();
+    setDragOverDate(null);
+    
+    if (!draggedAppointment) return;
+    
+    try {
+      const newDate = new Date(targetDate);
+      const newData = {
+        ...draggedAppointment,
+        data: targetDate
+      };
+      
+      await updateAgendaSessao(draggedAppointment.id, newData);
+      
+      toast({
+        title: "Consulta movida",
+        description: `Consulta movida para ${newDate.toLocaleDateString('pt-BR')}`,
+      });
+      
+      setDraggedAppointment(null);
+    } catch (error) {
+      console.error('Erro ao mover consulta:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao mover consulta. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatWeekRange = () => {
+    const start = weekDays[0];
+    const end = weekDays[6];
+    return `${start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} - ${end.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+  };
+
+  // Função para lidar com clique nos dias da semana
+  const handleWeekDayClick = (day: Date) => {
+    setSelectedDate(day);
+    // Scroll para a seção da agenda diária
+    const dailyAgendaSection = document.getElementById('daily-agenda-section');
+    if (dailyAgendaSection) {
+      dailyAgendaSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // Se ambos ainda estão carregando inicialmente, mostrar skeleton
   if (appointmentsLoading && patientsLoading) {
@@ -1318,7 +1416,7 @@ export default function Agenda() {
       </div>
 
       {/* Sistema de Busca e Filtros */}
-      <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+      <Card id="daily-agenda-section" className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
         <CardContent className="p-6">
           <div className="space-y-4">
             {/* Barra de busca principal */}
@@ -1720,7 +1818,16 @@ export default function Agenda() {
                         {/* Informações principais */}
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-2">
-                            <h3 className="font-semibold text-base sm:text-lg truncate">{appointment.patientName}</h3>
+                            <h3 className="font-semibold text-base sm:text-lg truncate flex items-center gap-2">
+                              {appointment.patientColor && (
+                                <div 
+                                  className="w-3 h-3 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: appointment.patientColor }}
+                                  title={`Cor: ${appointment.patientColor}`}
+                                />
+                              )}
+                              <span>{appointment.patientName}</span>
+                            </h3>
                             <div className="flex items-center gap-2">
                               {getStatusBadge(appointment.status)}
                               {agendaPagamentos[appointment.id] && agendaPagamentos[appointment.id].length > 0 && (
@@ -2212,6 +2319,163 @@ export default function Agenda() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Visualização Semanal */}
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Agenda Semanal
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newWeek = new Date(currentWeek);
+                  newWeek.setDate(newWeek.getDate() - 7);
+                  setCurrentWeek(newWeek);
+                }}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentWeek(new Date())}
+              >
+                Hoje
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newWeek = new Date(currentWeek);
+                  newWeek.setDate(newWeek.getDate() + 7);
+                  setCurrentWeek(newWeek);
+                }}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              <Badge variant="secondary">
+                {formatWeekRange()}
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <TooltipProvider>
+            <div className="grid grid-cols-7 gap-2">
+              {weekDays.map((day, index) => {
+                const dateStr = formatDateToYYYYMMDD(day);
+                const dayAppointments = weekAppointments[dateStr] || [];
+                const isToday = day.toDateString() === new Date().toDateString();
+                const isSelected = day.toDateString() === selectedDate.toDateString();
+                
+                return (
+                  <div
+                    key={dateStr}
+                    className={cn(
+                      "min-h-[120px] p-2 border rounded-lg transition-colors cursor-pointer",
+                      isToday && "bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800",
+                      isSelected && "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800",
+                      dragOverDate === dateStr && "bg-yellow-50 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-700",
+                      "hover:bg-gray-50 dark:hover:bg-gray-800"
+                    )}
+                    onClick={() => handleWeekDayClick(day)}
+                    onDragOver={(e) => handleDragOver(e, dateStr)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, dateStr)}
+                  >
+                    <div className="text-center mb-2">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {day.toLocaleDateString('pt-BR', { weekday: 'short' })}
+                      </div>
+                      <div className={cn(
+                        "text-sm font-medium",
+                        isToday && "text-blue-600 dark:text-blue-400",
+                        isSelected && "text-green-600 dark:text-green-400"
+                      )}>
+                        {day.getDate()}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      {dayAppointments.map((appointment) => {
+                        const paciente = pacientes.find(p => p.id === appointment.pacienteId);
+                        const pagamentos = agendaPagamentos[appointment.id] || [];
+                        
+                        return (
+                          <Tooltip key={appointment.id}>
+                            <TooltipTrigger asChild>
+                              <div
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, appointment)}
+                                className={cn(
+                                  "p-1 text-xs rounded cursor-move transition-colors",
+                                  "bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700",
+                                  "hover:bg-gray-50 dark:hover:bg-gray-700"
+                                )}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                                    {appointment.horario}
+                                  </span>
+                                  {getPagamentoStatusIcon(pagamentos)}
+                                </div>
+                                <div className="text-gray-600 dark:text-gray-400 truncate flex items-center gap-1">
+                                  {paciente?.cor && (
+                                    <div 
+                                      className="w-2 h-2 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: paciente.cor }}
+                                      title={`Cor: ${paciente.cor}`}
+                                    />
+                                  )}
+                                  <span>{paciente?.nome || 'Paciente não encontrado'}</span>
+                                </div>
+                                <div className="flex items-center gap-1 mt-1">
+                                  {getStatusBadge(appointment.status)}
+                                </div>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="space-y-1">
+                                <div><strong>Paciente:</strong> {paciente?.nome || 'Não encontrado'}</div>
+                                <div><strong>Horário:</strong> {appointment.horario}</div>
+                                <div><strong>Tipo:</strong> {appointment.tipoDaConsulta}</div>
+                                <div><strong>Modalidade:</strong> {appointment.modalidade}</div>
+                                <div><strong>Status:</strong> {getStatusLabel(appointment.status)}</div>
+                                {appointment.observacao && (
+                                  <div><strong>Observação:</strong> {appointment.observacao}</div>
+                                )}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </TooltipProvider>
+          
+          <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-4">
+                <span><strong>Total da semana:</strong> {Object.values(weekAppointments).flat().length} consultas</span>
+                <span><strong>Confirmadas:</strong> {Object.values(weekAppointments).flat().filter(a => a.status === 1).length}</span>
+                <span><strong>Pendentes:</strong> {Object.values(weekAppointments).flat().filter(a => a.status === 0).length}</span>
+                <span><strong>Realizadas:</strong> {Object.values(weekAppointments).flat().filter(a => a.status === 2).length}</span>
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                💡 Arraste as consultas para mover entre dias
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
