@@ -8,11 +8,13 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, loading } = useAuth();
+  const { authState, user } = useAuth();
   const location = useLocation();
 
-  // Mostrar loading enquanto verifica autenticação
-  if (loading) {
+  console.log('🔧 ProtectedRoute: Estado de auth:', authState);
+
+  // Mostrar loading enquanto inicializa
+  if (authState === 'INITIALIZING') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="text-center">
@@ -24,10 +26,22 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // Se não estiver autenticado, redirecionar para login
-  if (!isAuthenticated) {
+  if (authState === 'UNAUTHENTICATED' || authState === 'ERROR') {
+    console.log('🔧 ProtectedRoute: Não autenticado, redirecionando para login');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Se estiver autenticado, mostrar o conteúdo protegido
-  return <>{children}</>;
+  // REGRA: Se precisar de verificação, redirecionar para verificação
+  if (authState === 'NEEDS_VERIFICATION') {
+    console.log('🔧 ProtectedRoute: Usuário não verificado, redirecionando para verificação');
+    return <Navigate to="/email-verification" state={{ email: user?.email }} replace />;
+  }
+
+  // Se autenticado e verificado, permitir acesso
+  if (authState === 'AUTHENTICATED') {
+    return <>{children}</>;
+  }
+
+  // Fallback - não deveria chegar aqui
+  return <Navigate to="/login" replace />;
 }

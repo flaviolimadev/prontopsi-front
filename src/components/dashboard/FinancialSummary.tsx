@@ -4,9 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, TrendingUp, AlertTriangle, Calendar, CheckCircle, Clock, XCircle, CreditCard } from 'lucide-react';
 import { usePagamentos } from '@/hooks/usePagamentos';
+import { useFinancialVisibility } from '@/contexts/FinancialVisibilityContext';
 
 export function FinancialSummary() {
   const { pagamentos = [], loading, error } = usePagamentos();
+  const { isFinancialVisible } = useFinancialVisibility();
 
 
 
@@ -164,18 +166,24 @@ export function FinancialSummary() {
           <>
             {/* Estatísticas Rápidas */}
             <div className="grid grid-cols-2 gap-3">
-          <div className="bg-muted/30 rounded-lg p-4 border border-border/50 hover:bg-muted/40 transition-colors">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Projeção do Mês</div>
-            <div className="font-bold text-lg text-foreground">
-              R$ {financialData.projectedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      <div className="bg-muted/30 rounded-lg p-4 border border-border/50 hover:bg-muted/40 transition-colors">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Projeção do Mês</div>
+              <div className="font-bold text-lg text-foreground">
+                {isFinancialVisible 
+                  ? `R$ ${financialData.projectedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                  : "••••••••"
+                }
+              </div>
             </div>
-          </div>
-          <div className="bg-muted/30 rounded-lg p-4 border border-border/50 hover:bg-muted/40 transition-colors">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Valor Médio/Sessão</div>
-            <div className="font-bold text-lg text-foreground">
-              R$ {financialData.averageSession.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <div className="bg-muted/30 rounded-lg p-4 border border-border/50 hover:bg-muted/40 transition-colors">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Valor Médio/Sessão</div>
+              <div className="font-bold text-lg text-foreground">
+                {isFinancialVisible 
+                  ? `R$ ${financialData.averageSession.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                  : "••••••••"
+                }
+              </div>
             </div>
-          </div>
         </div>
 
         {/* Alertas */}
@@ -188,7 +196,10 @@ export function FinancialSummary() {
             <p className="text-sm text-muted-foreground">
               {financialData.overduePayments} pagamento(s) em atraso totalizando{' '}
               <span className="font-semibold text-foreground">
-                R$ {financialData.overdueAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                {isFinancialVisible 
+                  ? `R$ ${financialData.overdueAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                  : "••••••••"
+                }
               </span>
             </p>
           </div>
@@ -219,7 +230,10 @@ export function FinancialSummary() {
                       {month.month}
                     </div>
                     <div className="text-xs font-medium text-foreground">
-                      R$ {month.revenue.toLocaleString('pt-BR')}
+                      {isFinancialVisible 
+                        ? `R$ ${month.revenue.toLocaleString('pt-BR')}`
+                        : "••••••"
+                      }
                     </div>
                   </div>
                 );
@@ -240,7 +254,10 @@ export function FinancialSummary() {
                 <span className="text-sm font-semibold text-green-800 dark:text-green-200">Faturado</span>
               </div>
               <div className="text-xl font-bold text-green-900 dark:text-green-100">
-                R$ {financialData.paidTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                {isFinancialVisible 
+                  ? `R$ ${financialData.paidTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                  : "••••••••"
+                }
               </div>
               <p className="text-xs text-green-700 dark:text-green-300 mt-1">
                 {financialData.paidCount} pagamento{financialData.paidCount !== 1 ? 's' : ''} recebido{financialData.paidCount !== 1 ? 's' : ''}
@@ -253,7 +270,10 @@ export function FinancialSummary() {
                 <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">Previsão Total</span>
               </div>
               <div className="text-xl font-bold text-blue-900 dark:text-blue-100">
-                R$ {financialData.totalForecast.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                {isFinancialVisible 
+                  ? `R$ ${financialData.totalForecast.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                  : "••••••••"
+                }
               </div>
               <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
                 Incluindo 70% dos pendentes
@@ -269,7 +289,10 @@ export function FinancialSummary() {
                 <span className="text-xs font-medium text-yellow-800 dark:text-yellow-200">Pendentes</span>
               </div>
               <div className="text-sm font-bold text-yellow-900 dark:text-yellow-100">
-                R$ {financialData.pendingTotal.toLocaleString('pt-BR')}
+                {isFinancialVisible 
+                  ? `R$ ${financialData.pendingTotal.toLocaleString('pt-BR')}`
+                  : "••••••••"
+                }
               </div>
               <p className="text-xs text-yellow-700 dark:text-yellow-300">
                 {financialData.pendingCount} pag.
@@ -282,7 +305,10 @@ export function FinancialSummary() {
                 <span className="text-xs font-medium text-red-800 dark:text-red-200">Cancelados</span>
               </div>
               <div className="text-sm font-bold text-red-900 dark:text-red-100">
-                R$ {financialData.canceledTotal.toLocaleString('pt-BR')}
+                {isFinancialVisible 
+                  ? `R$ ${financialData.canceledTotal.toLocaleString('pt-BR')}`
+                  : "••••••••"
+                }
               </div>
               <p className="text-xs text-red-700 dark:text-red-300">
                 {financialData.canceledCount} pag.
@@ -295,7 +321,10 @@ export function FinancialSummary() {
                 <span className="text-xs font-medium text-purple-800 dark:text-purple-200">A Receber</span>
               </div>
               <div className="text-sm font-bold text-purple-900 dark:text-purple-100">
-                R$ {financialData.projectedFromPending.toLocaleString('pt-BR')}
+                {isFinancialVisible 
+                  ? `R$ ${financialData.projectedFromPending.toLocaleString('pt-BR')}`
+                  : "••••••••"
+                }
               </div>
               <p className="text-xs text-purple-700 dark:text-purple-300">
                 Previsão
@@ -314,7 +343,10 @@ export function FinancialSummary() {
             </Badge>
           </div>
           <div className="text-2xl font-bold text-foreground">
-            R$ {financialData.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            {isFinancialVisible 
+              ? `R$ ${financialData.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+              : "••••••••"
+            }
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             {pagamentos.length === 0 ? 'Nenhum pagamento registrado' : `Baseado em ${pagamentos.length} pagamentos`}

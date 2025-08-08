@@ -15,6 +15,7 @@ export interface Paciente {
   genero: string | null;
   observacao_geral: string | null;
   contato_emergencia: string | null;
+  contatos_emergencia: Array<{id: string, nome: string, telefone: string}> | null;
   medicacoes: any[] | null;
   status: number;
   createdAt: string;

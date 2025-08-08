@@ -289,6 +289,36 @@ grep -n "proxy_pass" nginx.conf
 ./test-nginx.sh
 ```
 
+### ❌ Problema: "502 Bad Gateway" no Frontend
+
+**Sintomas**: Frontend carrega mas mostra erro 502 ao tentar acessar a API
+
+**Causa**: A variável `VITE_API_URL` não está configurada ou o backend não está rodando.
+
+**Solução**: Configure as variáveis de ambiente no Coolify!
+
+```env
+# OBRIGATÓRIO no Coolify:
+VITE_API_URL=https://api.seudominio.com/api
+VITE_APP_NAME=ProntuPsi
+VITE_NODE_ENV=production
+```
+
+**Verificação**:
+```bash
+# Testar conexão com API
+node test-api-connection.js
+
+# Verificar variáveis no console do navegador
+console.log(import.meta.env.VITE_API_URL)
+```
+
+**Passos para corrigir**:
+1. **No Coolify**: Configure `VITE_API_URL` nas variáveis de ambiente
+2. **Backend**: Certifique-se que está rodando e acessível
+3. **Re-deploy**: Faça novo deploy do frontend
+4. **Teste**: Acesse a aplicação e verifique se o erro 502 sumiu
+
 ## 📝 Scripts Disponíveis
 
 ```bash

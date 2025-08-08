@@ -3,6 +3,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useProfile } from '@/hooks/useProfile';
 import { useDarkMode } from '@/components/theme/DarkModeProvider';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useFinancialVisibility } from '@/contexts/FinancialVisibilityContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -23,23 +24,39 @@ import {
   Sun,
   Moon,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Eye,
+  EyeOff,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  XCircle,
+  Trash2,
+  Check,
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useNotifications, Notification } from '@/hooks/useNotifications';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export function Header() {
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const { darkMode, toggleDarkMode } = useDarkMode();
   const { isCollapsed, toggleCollapsed } = useSidebar();
+  const { isFinancialVisible, toggleFinancialVisibility } = useFinancialVisibility();
+  const { 
+    notifications, 
+    unreadCount, 
+    loading, 
+    markAsRead, 
+    markAllAsRead, 
+    deleteNotification,
+    deleteAllNotifications 
+  } = useNotifications();
   const navigate = useNavigate();
-  const [notifications] = useState([
-    { id: 1, title: 'Nova consulta agendada', message: 'Consulta com Maria Silva às 14:00', time: '2 min atrás', unread: true },
-    { id: 2, title: 'Relatório semanal', message: 'Seu relatório semanal está pronto', time: '1 hora atrás', unread: true },
-    { id: 3, title: 'Aniversário do paciente', message: 'João Santos faz aniversário hoje', time: '3 horas atrás', unread: false },
-  ]);
-
-  const unreadCount = notifications.filter(n => n.unread).length;
 
   const handleLogout = () => {
     signOut(navigate);
@@ -51,6 +68,39 @@ export function Header() {
   };
 
   const displayName = profile?.nome || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'success':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'warning':
+        return <AlertCircle className="w-4 h-4 text-yellow-500" />;
+      case 'error':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'system':
+        return <Info className="w-4 h-4 text-blue-500" />;
+      default:
+        return <Info className="w-4 h-4 text-gray-500" />;
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (notification.status === 'unread') {
+      await markAsRead(notification.id);
+    }
+    
+    if (notification.actionUrl) {
+      navigate(notification.actionUrl);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    await markAllAsRead();
+  };
+
+  const handleDeleteAll = async () => {
+    await deleteAllNotifications();
+  };
 
   return (
     <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
@@ -73,6 +123,21 @@ export function Header() {
 
         {/* Right Side - Actions */}
         <div className="flex items-center space-x-2">
+          {/* Financial Visibility Toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleFinancialVisibility}
+            className="h-8 w-8 p-0"
+            title={isFinancialVisible ? "Ocultar valores financeiros" : "Mostrar valores financeiros"}
+          >
+            {isFinancialVisible ? (
+              <Eye className="h-4 w-4 text-green-600" />
+            ) : (
+              <EyeOff className="h-4 w-4 text-gray-600" />
+            )}
+          </Button>
+
           {/* Dark Mode Toggle */}
           <Button
             variant="ghost"
@@ -97,7 +162,7 @@ export function Header() {
                     variant="destructive" 
                     className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
                   >
-                    {unreadCount > 9 ? '9+' : unreadCount}
+                    {unreadCount > 99 ? '99+' : unreadCount}
                   </Badge>
                 )}
               </Button>
@@ -105,38 +170,84 @@ export function Header() {
             <DropdownMenuContent align="end" className="w-80">
               <DropdownMenuLabel className="flex items-center justify-between">
                 <span>Notificações</span>
-                {unreadCount > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    {unreadCount} nova{unreadCount > 1 ? 's' : ''}
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleMarkAllAsRead}
+                      className="text-xs h-6 px-2"
+                    >
+                      <Check className="w-3 h-3 mr-1" />
+                      Marcar todas como lidas
+                    </Button>
+                  )}
+                  {notifications.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleDeleteAll}
+                      className="text-xs h-6 px-2 text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {notifications.length > 0 ? (
-                notifications.map((notification) => (
-                  <DropdownMenuItem key={notification.id} className="flex flex-col items-start p-3 space-y-1">
-                    <div className="flex items-center justify-between w-full">
-                      <span className="font-medium text-sm text-gray-900 dark:text-white">
-                        {notification.title}
-                      </span>
-                      {notification.unread && (
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      )}
-                    </div>
-                    <span className="text-xs text-gray-600 dark:text-gray-400">
-                      {notification.message}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-500">
-                      {notification.time}
-                    </span>
-                  </DropdownMenuItem>
-                ))
-              ) : (
+              {loading ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <span className="ml-2">Carregando...</span>
+                </div>
+              ) : notifications.length === 0 ? (
                 <DropdownMenuItem disabled className="text-center py-4">
                   <span className="text-sm text-gray-500 dark:text-gray-400">
                     Nenhuma notificação
                   </span>
                 </DropdownMenuItem>
+              ) : (
+                notifications.map((notification) => (
+                  <DropdownMenuItem 
+                    key={notification.id} 
+                    className="flex flex-col items-start p-3 space-y-1 cursor-pointer"
+                    onClick={() => handleNotificationClick(notification)}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        {getNotificationIcon(notification.type)}
+                        <span className="font-medium text-sm text-gray-900 dark:text-white">
+                          {notification.title}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {notification.status === 'unread' && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        )}
+                        {notification.actionUrl && (
+                          <ExternalLink className="w-3 h-3 text-gray-400" />
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(notification.id);
+                          }}
+                          className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      {notification.message}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-500">
+                      {format(new Date(notification.createdAt), "dd 'de' MMM 'às' HH:mm", { locale: ptBR })}
+                    </span>
+                  </DropdownMenuItem>
+                ))
               )}
             </DropdownMenuContent>
           </DropdownMenu>

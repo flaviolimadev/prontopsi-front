@@ -1,5 +1,5 @@
 
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { PublicRoute } from "./components/auth/PublicRoute";
@@ -7,6 +7,7 @@ import { SubscriptionProvider } from "./contexts/SubscriptionContext";
 import { AppProvider } from "./contexts/AppContext";
 import { DarkModeProvider } from "./components/theme/DarkModeProvider";
 import { SidebarProvider } from "./contexts/SidebarContext";
+import { FinancialVisibilityProvider } from "./contexts/FinancialVisibilityContext";
 import { Toaster } from "./components/ui/toaster";
 import { AppLayout } from "./components/layout/AppLayout";
 
@@ -14,6 +15,9 @@ import { AppLayout } from "./components/layout/AppLayout";
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
+import EmailVerification from "./pages/EmailVerification";
+import PublicCadastro from "./pages/PublicCadastro";
+import CadastroSucesso from "./pages/CadastroSucesso";
 
 // Páginas protegidas
 import Dashboard from "./pages/Dashboard";
@@ -38,158 +42,172 @@ function App() {
         <AppProvider>
           <SubscriptionProvider>
             <SidebarProvider>
-              <AuthProvider>
-              <Routes>
-                {/* Páginas públicas */}
-                <Route path="/" element={<LandingPage />} />
-                <Route
-                  path="/login"
-                  element={
-                    <PublicRoute>
-                      <Login />
-                    </PublicRoute>
-                  }
-                />
-                <Route
-                  path="/signup"
-                  element={
-                    <PublicRoute>
-                      <SignUp />
-                    </PublicRoute>
-                  }
-                />
+              <FinancialVisibilityProvider>
+                <AuthProvider>
+                <Routes>
+                  {/* Páginas públicas */}
+                  <Route path="/" element={<LandingPage />} />
+                  <Route 
+                    path="/login" 
+                    element={
+                      <PublicRoute>
+                        <Login />
+                      </PublicRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/signup" 
+                    element={
+                      <PublicRoute>
+                        <SignUp />
+                      </PublicRoute>
+                    } 
+                  />
+                  <Route
+                    path="/email-verification"
+                    element={<EmailVerification />}
+                  />
+                  <Route
+                    path="/cadastro/:token"
+                    element={<PublicCadastro />}
+                  />
+                  <Route
+                    path="/cadastro-sucesso"
+                    element={<CadastroSucesso />}
+                  />
 
-                {/* Páginas protegidas */}
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Dashboard />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/pacientes"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Pacientes />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/pacientes/:id"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <PatientProfile />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/agenda"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Agenda />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/prontuarios"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Prontuarios />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/prontuarios/:patientId"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Prontuarios />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/financeiro"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Financeiro />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/arquivos"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Arquivos />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/relatorios"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Relatorios />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/configuracoes"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Configuracoes />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/checkout"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <Checkout />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/plan-selection"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout>
-                        <PlanSelection />
-                      </AppLayout>
-                    </ProtectedRoute>
-                  }
-                />
+                  {/* Páginas protegidas */}
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Dashboard />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/pacientes"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Pacientes />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/pacientes/:id"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <PatientProfile />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/agenda"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Agenda />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/prontuarios"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Prontuarios />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/prontuarios/:patientId"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Prontuarios />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/financeiro"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Financeiro />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/arquivos"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Arquivos />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/relatorios"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Relatorios />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/configuracoes"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Configuracoes />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/checkout"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Checkout />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/plan-selection"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <PlanSelection />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
 
-                {/* Redirecionamentos */}
-                <Route path="/index" element={<Navigate to="/dashboard" replace />} />
+                  {/* Redirecionamentos */}
+                  <Route path="/index" element={<Navigate to="/dashboard" replace />} />
 
-                {/* Página 404 */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+                  {/* Página 404 */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
 
-              <Toaster />
-            </AuthProvider>
+                <Toaster />
+              </AuthProvider>
+              </FinancialVisibilityProvider>
             </SidebarProvider>
           </SubscriptionProvider>
         </AppProvider>

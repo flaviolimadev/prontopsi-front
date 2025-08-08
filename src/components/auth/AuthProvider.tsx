@@ -1,33 +1,48 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import apiService from '../../services/api.service';
 
+// Tipos de estado de autenticação
+type AuthState = 
+  | 'INITIALIZING'     // Carregando inicial
+  | 'UNAUTHENTICATED'  // Sem autenticação
+  | 'AUTHENTICATED'    // Autenticado e verificado
+  | 'NEEDS_VERIFICATION' // Logado mas precisa verificar email
+  | 'ERROR';           // Erro de autenticação
+
 interface User {
   id: string;
+  email: string;
   nome: string;
   sobrenome: string;
-  email: string;
-  code: string;
-  contato?: string;
-  status: number;
-  pontos: number;
-  nivelId: number;
-  planoId?: string;
-  avatar?: string;
-  descricao?: string;
-  referredAt?: string;
-  createdAt: string;
-  updatedAt: string;
+  emailVerified: boolean;
+  [key: string]: any;
 }
 
 interface AuthContextType {
+  // Estados
+  authState: AuthState;
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signUp: (userData: any) => Promise<{ success: boolean; error?: string }>;
-  signOut: (navigate?: (path: string) => void) => void;
+  
+  // Ações
+  signIn: (email: string, password: string) => Promise<{
+    success: boolean;
+    error?: string;
+    requiresVerification?: boolean;
+    email?: string;
+  }>;
+  signUp: (userData: any) => Promise<{
+    success: boolean;
+    error?: string;
+    requiresVerification?: boolean;
+    email?: string;
+  }>;
+  signOut: (navigate?: (path: string) => void) => Promise<void>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  
+  // Estados derivados
   isAuthenticated: boolean;
+  needsVerification: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,49 +52,129 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
+  const [authState, setAuthState] = useState<AuthState>('INITIALIZING');
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // Verificar se o usuário está autenticado ao carregar a aplicação
+  console.log('🔧 AuthProvider: Estado atual:', authState);
+
+  // Inicialização única e controlada
   useEffect(() => {
-    const checkAuth = async () => {
+    let isMounted = true;
+    
+    const initializeAuth = async () => {
+      console.log('🔧 AuthProvider: Inicializando autenticação...');
+      
       const token = localStorage.getItem('auth_token');
       
-      if (token) {
-        try {
-          // Verificar se o token ainda é válido
-          const userData = await apiService.getCurrentUser();
+      if (!token) {
+        console.log('🔧 AuthProvider: Sem token, usuário não autenticado');
+        if (isMounted) {
+          setAuthState('UNAUTHENTICATED');
+        }
+        return;
+      }
+      
+      try {
+        console.log('🔧 AuthProvider: Verificando token existente...');
+        const userData = await apiService.getCurrentUser();
+        
+        if (!isMounted) return;
+        
+        console.log('🔧 AuthProvider: Dados do usuário:', {
+          email: userData.email,
+          emailVerified: userData.emailVerified,
+          status: userData.status
+        });
+        
+        // Se emailVerified for undefined, tratar como false
+        const isEmailVerified = userData.emailVerified === true;
+        const isActive = userData.status === 1;
+        
+        console.log('🔧 AuthProvider: Verificações:', {
+          isEmailVerified,
+          isActive,
+          emailVerified: userData.emailVerified
+        });
+        
+        if (isEmailVerified && isActive) {
+          console.log('🔧 AuthProvider: Usuário autenticado e verificado');
           setUser(userData);
-        } catch (error) {
-          console.error('Erro ao verificar autenticação:', error);
+          setAuthState('AUTHENTICATED');
+        } else {
+          console.log('🔧 AuthProvider: Usuário não verificado ou inativo');
+          setUser(userData);
+          setAuthState('NEEDS_VERIFICATION');
+        }
+      } catch (error) {
+        console.log('🔧 AuthProvider: Token inválido, limpando dados');
+        if (isMounted) {
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user');
+          setUser(null);
+          setAuthState('UNAUTHENTICATED');
         }
       }
-      setLoading(false);
     };
 
-    checkAuth();
-  }, []);
+    initializeAuth();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Apenas uma execução
 
   const signIn = async (email: string, password: string) => {
+    console.log('🔧 AuthProvider: Iniciando login para:', email);
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      
       const response = await apiService.login(email, password);
       
-      // Salvar token e dados do usuário
+      console.log('🔧 AuthProvider: Login bem-sucedido');
+      
+      // Salvar dados
       localStorage.setItem('auth_token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
+      setUser(response.user as User);
       
-      setUser(response.user);
+      if (response.user.emailVerified) {
+        setAuthState('AUTHENTICATED');
+        return { success: true };
+      } else {
+        setAuthState('NEEDS_VERIFICATION');
+        return { 
+          success: false, 
+          requiresVerification: true,
+          email: email 
+        };
+      }
       
-      return { success: true };
     } catch (error: any) {
-      console.error('Erro no login:', error);
+      console.log('🔧 AuthProvider: Erro no login:', error.response?.data?.message);
+      
+      const errorMessage = error.response?.data?.message || '';
+      
+      // Verificar se é erro de email não verificado ou usuário inativo
+      if (errorMessage.includes('Email não verificado') || 
+          errorMessage.includes('email não verificado') ||
+          errorMessage.includes('Usuário inativo')) {
+        
+        console.log('🔧 AuthProvider: Email não verificado ou usuário inativo');
+        console.log('🔧 AuthProvider: Definindo estado NEEDS_VERIFICATION');
+        
+        setAuthState('NEEDS_VERIFICATION');
+        return { 
+          success: false, 
+          requiresVerification: true,
+          email: email 
+        };
+      }
+      
+      setAuthState('ERROR');
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Erro ao fazer login' 
+        error: errorMessage || 'Erro ao fazer login' 
       };
     } finally {
       setLoading(false);
@@ -87,20 +182,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const signUp = async (userData: any) => {
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      
       const response = await apiService.register(userData);
       
-      // Salvar token e dados do usuário
-      localStorage.setItem('auth_token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      if (response.requiresVerification) {
+        setAuthState('NEEDS_VERIFICATION');
+        return { 
+          success: false, 
+          requiresVerification: true,
+          email: userData.email
+        };
+      }
       
-      setUser(response.user);
+      if (response.token) {
+        localStorage.setItem('auth_token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        setUser(response.user);
+        setAuthState('AUTHENTICATED');
+      }
       
       return { success: true };
     } catch (error: any) {
-      console.error('Erro no registro:', error);
+      console.error('🔧 AuthProvider: Erro no registro:', error);
+      setAuthState('ERROR');
       return { 
         success: false, 
         error: error.response?.data?.message || 'Erro ao criar conta' 
@@ -112,52 +218,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = async (navigate?: (path: string) => void) => {
     try {
-      // Chamar logout no backend
       await apiService.logout();
     } catch (error) {
-      console.error('Erro no logout:', error);
+      console.error('🔧 AuthProvider: Erro no logout:', error);
     } finally {
-      // Limpar dados locais
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
       setUser(null);
+      setAuthState('UNAUTHENTICATED');
       
-      // Redirecionar
       if (navigate) {
         navigate('/login');
-      } else {
-        window.location.href = '/login';
       }
     }
   };
 
   const resetPassword = async (email: string) => {
-    try {
-      setLoading(true);
-      
-      // Implementar quando o backend tiver essa funcionalidade
-      // await apiService.resetPassword(email);
-      
-      return { success: true };
-    } catch (error: any) {
-      console.error('Erro no reset de senha:', error);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Erro ao resetar senha' 
-      };
-    } finally {
-      setLoading(false);
-    }
+    // Função placeholder - implementar quando necessário
+    return { 
+      success: false, 
+      error: 'Função de reset de senha não implementada' 
+    };
   };
 
+  // Estados derivados
+  const isAuthenticated = authState === 'AUTHENTICATED';
+  const needsVerification = authState === 'NEEDS_VERIFICATION';
+  const isLoading = authState === 'INITIALIZING' || loading;
+
   const value: AuthContextType = {
+    authState,
     user,
-    loading,
+    loading: isLoading,
     signIn,
     signUp,
     signOut,
     resetPassword,
-    isAuthenticated: !!user,
+    isAuthenticated,
+    needsVerification,
   };
 
   return (

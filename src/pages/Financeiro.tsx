@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { DollarSign, Plus, TrendingUp, Calendar, Download, User, CreditCard, CalendarIcon, Package, Edit, Trash2, Power, PowerOff, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, Calendar, Download, User, CreditCard, CalendarIcon, Package, Edit, Trash2, Power, PowerOff, RefreshCw, ChevronDown, ChevronUp, Filter, X } from "lucide-react";
 import { format } from "date-fns";
 import { usePatients } from "@/hooks/usePatients";
 import { usePacotes } from "../hooks/usePacotes";
@@ -19,6 +19,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useFinancialVisibility } from "@/contexts/FinancialVisibilityContext";
 
 // Dados financeiros serão carregados do contexto global
 
@@ -28,7 +29,10 @@ export default function Financeiro() {
   const { pagamentos, loading: pagamentosLoading, fetchPagamentos, createPagamento, updatePagamento, deletePagamento, updatePagamentoStatus } = usePagamentos();
   const [startDate, setStartDate] = useState<Date | undefined>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
+  const [filteredPagamentos, setFilteredPagamentos] = useState<any[]>([]);
+  const [isFiltered, setIsFiltered] = useState(false);
   const { toast } = useToast();
+  const { isFinancialVisible } = useFinancialVisibility();
 
   // Função para formatar data sem problemas de timezone
   const formatDateToYYYYMMDD = (date: Date): string => {
@@ -37,6 +41,45 @@ export default function Financeiro() {
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+
+  // Função para aplicar filtro por período
+  const applyDateFilter = () => {
+    if (!startDate || !endDate) {
+      toast({
+        title: "Erro",
+        description: "Por favor, selecione as datas inicial e final.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const filtered = pagamentos.filter(pagamento => {
+      const paymentDate = new Date(pagamento.data);
+      return paymentDate >= startDate && paymentDate <= endDate;
+    });
+
+    setFilteredPagamentos(filtered);
+    setIsFiltered(true);
+    
+    toast({
+      title: "Filtro Aplicado",
+      description: `${filtered.length} pagamentos encontrados no período selecionado.`,
+    });
+  };
+
+  // Função para limpar filtro
+  const clearDateFilter = () => {
+    setFilteredPagamentos([]);
+    setIsFiltered(false);
+    
+    toast({
+      title: "Filtro Limpo",
+      description: "Exibindo todos os pagamentos.",
+    });
+  };
+
+  // Dados a serem exibidos (filtrados ou todos)
+  const displayPagamentos = isFiltered ? filteredPagamentos : pagamentos;
   
   // Estados para o combobox de pacientes
   const [patientComboOpen, setPatientComboOpen] = useState(false);
@@ -547,9 +590,20 @@ export default function Financeiro() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold text-foreground">Financeiro</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-foreground">Financeiro</h1>
+            {isFiltered && (
+              <Badge variant="secondary" className="text-xs">
+                <Filter className="w-3 h-3 mr-1" />
+                Filtrado
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
-            Controle seus ganhos e pagamentos
+            {isFiltered 
+              ? `Exibindo ${displayPagamentos.length} pagamentos do período selecionado`
+              : "Controle seus ganhos e pagamentos"
+            }
           </p>
         </div>
         <div className="flex gap-2">
@@ -725,103 +779,125 @@ export default function Financeiro() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-            {/* Data Inicial */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            {/* Período Único */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Data Inicial</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal h-10",
-                      !startDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, "dd/MM/yyyy") : "Selecionar data"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={startDate}
-                    onSelect={setStartDate}
-                    className={cn("rounded-md border w-full pointer-events-auto")}
-                    classNames={{
-                      day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-lg",
-                      day_today: "bg-accent text-accent-foreground rounded-lg",
-                      day_outside: "text-muted-foreground opacity-50",
-                      day_disabled: "text-muted-foreground opacity-50",
-                      day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
-                      day_hidden: "invisible",
-                      day: "h-9 w-9 text-center text-sm p-0 relative hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200",
-                      cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label className="text-sm font-medium">Período</Label>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "flex-1 justify-start text-left font-normal h-10",
+                        !startDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "dd/MM/yyyy") : "Data inicial"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={startDate}
+                      onSelect={setStartDate}
+                      className={cn("rounded-md border w-full pointer-events-auto")}
+                      classNames={{
+                        day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-lg",
+                        day_today: "bg-accent text-accent-foreground rounded-lg",
+                        day_outside: "text-muted-foreground opacity-50",
+                        day_disabled: "text-muted-foreground opacity-50",
+                        day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                        day_hidden: "invisible",
+                        day: "h-9 w-9 text-center text-sm p-0 relative hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200",
+                        cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                
+                <span className="text-muted-foreground self-center">até</span>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "flex-1 justify-start text-left font-normal h-10",
+                        !endDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, "dd/MM/yyyy") : "Data final"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={endDate}
+                      onSelect={setEndDate}
+                      disabled={(date) => startDate ? date < startDate : false}
+                      className={cn("rounded-md border w-full pointer-events-auto")}
+                      classNames={{
+                        day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-lg",
+                        day_today: "bg-accent text-accent-foreground rounded-lg",
+                        day_outside: "text-muted-foreground opacity-50",
+                        day_disabled: "text-muted-foreground opacity-50",
+                        day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                        day_hidden: "invisible",
+                        day: "h-9 w-9 text-center text-sm p-0 relative hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200",
+                        cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
-            {/* Data Final */}
+            {/* Botões de Ação */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Data Final</Label>
-              <Popover>
-                <PopoverTrigger asChild>
+              <Label className="text-sm font-medium">Ações</Label>
+              <div className="flex gap-2">
+                <Button
+                  onClick={applyDateFilter}
+                  disabled={!startDate || !endDate}
+                  className="flex-1"
+                  size="sm"
+                >
+                  <Filter className="w-4 h-4 mr-2" />
+                  Filtrar
+                </Button>
+                {isFiltered && (
                   <Button
                     variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal h-10",
-                      !endDate && "text-muted-foreground"
-                    )}
+                    onClick={clearDateFilter}
+                    className="flex-1"
+                    size="sm"
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, "dd/MM/yyyy") : "Selecionar data"}
+                    <X className="w-4 h-4 mr-2" />
+                    Limpar
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={endDate}
-                    onSelect={setEndDate}
-                    disabled={(date) => startDate ? date < startDate : false}
-                    className={cn("rounded-md border w-full pointer-events-auto")}
-                    classNames={{
-                      day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-lg",
-                      day_today: "bg-accent text-accent-foreground rounded-lg",
-                      day_outside: "text-muted-foreground opacity-50",
-                      day_disabled: "text-muted-foreground opacity-50",
-                      day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
-                      day_hidden: "invisible",
-                      day: "h-9 w-9 text-center text-sm p-0 relative hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200",
-                      cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* Período Selecionado e Info */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Período Selecionado</Label>
-              <div className="h-10 px-3 py-2 bg-muted rounded-md border flex items-center">
-                <span className="text-sm text-muted-foreground">
-                  {startDate && endDate ? (
-                    <>
-                      {format(startDate, "dd/MM/yyyy")} - {format(endDate, "dd/MM/yyyy")}
-                      <span className="ml-2 text-xs">
-                        ({Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1} dias)
-                      </span>
-                    </>
-                  ) : (
-                    "Selecione as datas"
-                  )}
-                </span>
+                )}
               </div>
             </div>
           </div>
+          
+          {/* Período Selecionado Info */}
+          {startDate && endDate && (
+            <div className="mt-4 p-3 bg-muted rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Período: {format(startDate, "dd/MM/yyyy")} - {format(endDate, "dd/MM/yyyy")}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1} dias
+                </span>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -869,20 +945,23 @@ export default function Financeiro() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Pendentes</span>
                   <span className="text-lg font-bold text-yellow-800 dark:text-yellow-200">
-                    {pagamentos.filter(p => p.status === 0).length}
+                    {displayPagamentos.filter(p => p.status === 0).length}
                   </span>
                 </div>
                 <div className="w-full bg-yellow-100 dark:bg-yellow-900 rounded-full h-3 overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000 ease-out animate-pulse"
                     style={{
-                      width: `${pagamentos.length > 0 ? (pagamentos.filter(p => p.status === 0).length / pagamentos.length) * 100 : 0}%`,
+                      width: `${displayPagamentos.length > 0 ? (displayPagamentos.filter(p => p.status === 0).length / displayPagamentos.length) * 100 : 0}%`,
                       animationDelay: '0.1s'
                     }}
                   ></div>
                 </div>
                 <div className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">
-                  R$ {pagamentos.filter(p => p.status === 0).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {isFinancialVisible 
+                    ? `R$ ${displayPagamentos.filter(p => p.status === 0).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                    : "••••••••"
+                  }
                 </div>
               </div>
 
@@ -891,20 +970,23 @@ export default function Financeiro() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-green-700 dark:text-green-300">Pagos</span>
                   <span className="text-lg font-bold text-green-800 dark:text-green-200">
-                    {pagamentos.filter(p => p.status === 1 || p.status === 2).length}
+                    {displayPagamentos.filter(p => p.status === 1 || p.status === 2).length}
                   </span>
                 </div>
                 <div className="w-full bg-green-100 dark:bg-green-900 rounded-full h-3 overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
                     style={{
-                      width: `${pagamentos.length > 0 ? (pagamentos.filter(p => p.status === 1 || p.status === 2).length / pagamentos.length) * 100 : 0}%`,
+                      width: `${displayPagamentos.length > 0 ? (displayPagamentos.filter(p => p.status === 1 || p.status === 2).length / displayPagamentos.length) * 100 : 0}%`,
                       animationDelay: '0.2s'
                     }}
                   ></div>
                 </div>
                 <div className="mt-2 text-xs text-green-600 dark:text-green-400">
-                  R$ {pagamentos.filter(p => p.status === 1 || p.status === 2).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {isFinancialVisible 
+                    ? `R$ ${displayPagamentos.filter(p => p.status === 1 || p.status === 2).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                    : "••••••••"
+                  }
                 </div>
               </div>
 
@@ -913,20 +995,23 @@ export default function Financeiro() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-red-700 dark:text-red-300">Cancelados</span>
                   <span className="text-lg font-bold text-red-800 dark:text-red-200">
-                    {pagamentos.filter(p => p.status === 3).length}
+                    {displayPagamentos.filter(p => p.status === 3).length}
                   </span>
                 </div>
                 <div className="w-full bg-red-100 dark:bg-red-900 rounded-full h-3 overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-red-400 to-red-600 rounded-full transition-all duration-1000 ease-out"
                     style={{
-                      width: `${pagamentos.length > 0 ? (pagamentos.filter(p => p.status === 3).length / pagamentos.length) * 100 : 0}%`,
+                      width: `${displayPagamentos.length > 0 ? (displayPagamentos.filter(p => p.status === 3).length / displayPagamentos.length) * 100 : 0}%`,
                       animationDelay: '0.3s'
                     }}
                   ></div>
                 </div>
                 <div className="mt-2 text-xs text-red-600 dark:text-red-400">
-                  R$ {pagamentos.filter(p => p.status === 3).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {isFinancialVisible 
+                    ? `R$ ${displayPagamentos.filter(p => p.status === 3).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                    : "••••••••"
+                  }
                 </div>
               </div>
             </div>
@@ -945,7 +1030,7 @@ export default function Financeiro() {
                   {/* Animated segments */}
                   {(() => {
                     // Filtrar apenas pagamentos pagos/confirmados para o gráfico de tipos
-                    const paidPayments = pagamentos.filter(p => p.status === 1 || p.status === 2);
+                    const paidPayments = displayPagamentos.filter(p => p.status === 1 || p.status === 2);
                     const totalPayments = paidPayments.length;
                     const pixCount = paidPayments.filter(p => p.type === 1).length;
                     const cardCount = paidPayments.filter(p => p.type === 2).length;
@@ -1028,7 +1113,10 @@ export default function Financeiro() {
                             <span className="text-sm font-bold text-green-600 dark:text-white">{paidPayments.filter(p => p.type === 1).length}</span>
                           </div>
                           <div className="text-xs text-gray-500 dark:text-white">
-                            R$ {paidPayments.filter(p => p.type === 1).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {isFinancialVisible 
+                              ? `R$ ${paidPayments.filter(p => p.type === 1).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                              : "••••••••"
+                            }
                           </div>
                         </div>
                       </div>
@@ -1041,7 +1129,10 @@ export default function Financeiro() {
                             <span className="text-sm font-bold text-blue-600 dark:text-white">{paidPayments.filter(p => p.type === 2).length}</span>
                           </div>
                           <div className="text-xs text-gray-500 dark:text-white">
-                            R$ {paidPayments.filter(p => p.type === 2).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {isFinancialVisible 
+                              ? `R$ ${paidPayments.filter(p => p.type === 2).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                              : "••••••••"
+                            }
                           </div>
                         </div>
                       </div>
@@ -1054,7 +1145,10 @@ export default function Financeiro() {
                             <span className="text-sm font-bold text-yellow-600 dark:text-white">{paidPayments.filter(p => p.type === 3).length}</span>
                           </div>
                           <div className="text-xs text-gray-500 dark:text-white">
-                            R$ {paidPayments.filter(p => p.type === 3).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {isFinancialVisible 
+                              ? `R$ ${paidPayments.filter(p => p.type === 3).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                              : "••••••••"
+                            }
                           </div>
                         </div>
                       </div>
@@ -1067,7 +1161,10 @@ export default function Financeiro() {
                             <span className="text-sm font-bold text-purple-600 dark:text-white">{paidPayments.filter(p => p.type === 4).length}</span>
                           </div>
                           <div className="text-xs text-gray-500 dark:text-white">
-                            R$ {paidPayments.filter(p => p.type === 4).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {isFinancialVisible 
+                              ? `R$ ${paidPayments.filter(p => p.type === 4).reduce((sum, p) => sum + Number(p.value || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                              : "••••••••"
+                            }
                           </div>
                         </div>
                       </div>
@@ -1204,7 +1301,7 @@ export default function Financeiro() {
                           >
                             {/* Tooltip */}
                             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                              {week.label}: R$ {week.value.toLocaleString('pt-BR')}
+                              {week.label}: {isFinancialVisible ? `R$ ${week.value.toLocaleString('pt-BR')}` : "••••••••"}
                               <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                             </div>
                           </div>
@@ -1218,18 +1315,24 @@ export default function Financeiro() {
                         <div key={index} className="text-center">
                           <div className="text-xs font-medium text-gray-700 dark:text-white">{week.label}</div>
                           <div className="text-xs text-gray-500 dark:text-white">{week.date}</div>
-                          <div className="text-xs text-blue-600 dark:text-white font-semibold">
-                            {week.count} pag.
-                          </div>
+                                                      <div className="text-xs text-blue-600 dark:text-white font-semibold">
+                              {week.count} pag.
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-white">
+                              {isFinancialVisible 
+                                ? `R$ ${week.value.toLocaleString('pt-BR')}`
+                                : "••••••••"
+                              }
+                            </div>
                         </div>
                       ))}
                     </div>
                     
                     {/* Legenda de valores */}
                     <div className="flex justify-between items-center mt-4 text-xs text-gray-500 dark:text-white">
-                      <span>Min: R$ {minValue.toLocaleString('pt-BR')}</span>
+                      <span>Min: {isFinancialVisible ? `R$ ${minValue.toLocaleString('pt-BR')}` : "••••••••"}</span>
                       <span className="text-center">Últimas 4 semanas</span>
-                      <span>Max: R$ {maxValue.toLocaleString('pt-BR')}</span>
+                      <span>Max: {isFinancialVisible ? `R$ ${maxValue.toLocaleString('pt-BR')}` : "••••••••"}</span>
                     </div>
                   </div>
                 );
@@ -1263,7 +1366,10 @@ export default function Financeiro() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Recebido</p>
                 <p className="text-2xl font-bold text-success">
-                  R$ {monthlyStats.totalReceived.toLocaleString('pt-BR')}
+                  {isFinancialVisible 
+                    ? `R$ ${monthlyStats.totalReceived.toLocaleString('pt-BR')}`
+                    : "••••••••"
+                  }
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-success" />
@@ -1277,7 +1383,10 @@ export default function Financeiro() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Pendente</p>
                 <p className="text-2xl font-bold text-warning">
-                  R$ {monthlyStats.totalPending.toLocaleString('pt-BR')}
+                  {isFinancialVisible 
+                    ? `R$ ${monthlyStats.totalPending.toLocaleString('pt-BR')}`
+                    : "••••••••"
+                  }
                 </p>
               </div>
               <DollarSign className="h-8 w-8 text-warning" />
@@ -1305,7 +1414,10 @@ export default function Financeiro() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Valor Médio</p>
                 <p className="text-2xl font-bold text-accent">
-                  R$ {monthlyStats.averageValue.toLocaleString('pt-BR')}
+                  {isFinancialVisible 
+                    ? `R$ ${monthlyStats.averageValue.toLocaleString('pt-BR')}`
+                    : "••••••••"
+                  }
                 </p>
               </div>
               <CreditCard className="h-8 w-8 text-accent" />
@@ -1374,10 +1486,13 @@ export default function Financeiro() {
                       <div className="flex-1">
                         <h3 className="font-semibold text-lg">{pacote.title}</h3>
                         <p className="text-2xl font-bold text-primary mt-1">
-                          {new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL'
-                          }).format(pacote.value)}
+                          {isFinancialVisible 
+                            ? new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL'
+                              }).format(pacote.value)
+                            : "••••••••"
+                          }
                         </p>
                       </div>
                       <Badge variant={pacote.ativo ? "default" : "secondary"}>
@@ -1568,7 +1683,10 @@ export default function Financeiro() {
                 Meus Pagamentos
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Gerencie todos os pagamentos dos seus pacientes
+                {isFiltered 
+                  ? `Exibindo ${displayPagamentos.length} pagamentos do período selecionado`
+                  : "Gerencie todos os pagamentos dos seus pacientes"
+                }
               </p>
             </div>
             <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
@@ -1617,7 +1735,7 @@ export default function Financeiro() {
                         <SelectItem value="nenhum">Nenhum pacote</SelectItem>
                         {pacotes?.filter(pacote => pacote.ativo).map((pacote) => (
                           <SelectItem key={pacote.id} value={pacote.id}>
-                            {pacote.title} - R$ {Number(pacote.value || 0).toFixed(2)}
+                            {pacote.title} - {isFinancialVisible ? `R$ ${Number(pacote.value || 0).toFixed(2)}` : "••••••••"}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1711,16 +1829,21 @@ export default function Financeiro() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
               <p className="text-muted-foreground mt-2">Carregando pagamentos...</p>
             </div>
-          ) : pagamentos.length === 0 ? (
+          ) : displayPagamentos.length === 0 ? (
             <div className="text-center py-8">
               <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">
-                Nenhum pagamento registrado ainda
+                {isFiltered 
+                  ? "Nenhum pagamento encontrado no período selecionado"
+                  : "Nenhum pagamento registrado ainda"
+                }
               </p>
-              <Button variant="outline" className="mt-4 gap-2" onClick={() => setIsPaymentModalOpen(true)}>
-                <Plus className="h-4 w-4" />
-                Criar Primeiro Pagamento
-              </Button>
+              {!isFiltered && (
+                <Button variant="outline" className="mt-4 gap-2" onClick={() => setIsPaymentModalOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  Criar Primeiro Pagamento
+                </Button>
+              )}
             </div>
           ) : (
             <Table>
@@ -1737,7 +1860,7 @@ export default function Financeiro() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pagamentos.map((pagamento) => (
+                {displayPagamentos.map((pagamento) => (
                   <TableRow key={pagamento.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -1752,10 +1875,13 @@ export default function Financeiro() {
                       {new Date(pagamento.vencimento).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      }).format(pagamento.value)}
+                      {isFinancialVisible 
+                        ? new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL'
+                          }).format(pagamento.value)
+                        : "••••••••"
+                      }
                     </TableCell>
                     <TableCell>
                       {pagamento.pacote?.title || '-'}

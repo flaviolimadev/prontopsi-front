@@ -13,6 +13,10 @@ import {
 import { usePacientes } from '@/hooks/usePacientes';
 import { PacientesTable } from '@/components/pacientes/PacientesTable';
 import { PacienteForm } from '@/components/pacientes/PacienteForm';
+import { RegistroRapidoForm } from '@/components/pacientes/RegistroRapidoForm';
+import CadastroLinksManager from '@/components/cadastro-links/CadastroLinksManager';
+import { SubmissionsManager } from '@/components/cadastro-links/SubmissionsManager';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Pacientes() {
   const {
@@ -79,12 +83,36 @@ export default function Pacientes() {
             Gerencie seus pacientes e suas informações
           </p>
         </div>
-        <PacienteForm
-          onSubmit={handleCreatePaciente}
-          loading={loading}
-          mode="create"
-        />
       </div>
+
+      <Tabs defaultValue="pacientes" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="pacientes">Pacientes</TabsTrigger>
+          <TabsTrigger value="links">Links de Cadastro</TabsTrigger>
+          <TabsTrigger value="submissions">Solicitações</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pacientes" className="space-y-6">
+          {/* Header dos Pacientes */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Lista de Pacientes</h2>
+              <p className="text-muted-foreground">
+                Visualize e gerencie todos os seus pacientes
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <PacienteForm
+                onSubmit={handleCreatePaciente}
+                loading={loading}
+                mode="create"
+              />
+              <RegistroRapidoForm
+                onSubmit={handleCreatePaciente}
+                loading={loading}
+              />
+            </div>
+          </div>
 
       {/* Estatísticas */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -159,17 +187,27 @@ export default function Pacientes() {
         onReactivate={handleReactivatePaciente}
       />
 
-      {/* Mensagem de erro */}
-      {error && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2 text-red-600">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{error}</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          {/* Mensagem de erro */}
+          {error && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 text-red-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{error}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="links" className="space-y-6">
+          <CadastroLinksManager />
+        </TabsContent>
+
+        <TabsContent value="submissions" className="space-y-6">
+          <SubmissionsManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

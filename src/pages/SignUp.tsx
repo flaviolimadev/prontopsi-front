@@ -101,7 +101,15 @@ export default function SignUp() {
       });
 
       if (result.success) {
+        // Se o cadastro foi bem-sucedido e não precisa de verificação
         navigate("/dashboard", { replace: true });
+      } else if (result.requiresVerification) {
+        // REGRA: Se precisa de verificação, redirecionar para verificação
+        console.log('🔧 SignUp: Email precisa de verificação, redirecionando');
+        navigate("/email-verification", { 
+          state: { email: result.email },
+          replace: true 
+        });
       } else {
         setError(result.error || "Erro ao criar conta");
       }

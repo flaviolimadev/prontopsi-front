@@ -1,13 +1,13 @@
 import React, { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../components/auth/AuthProvider";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Alert, AlertDescription } from "../components/ui/alert";
-import { Eye, EyeOff, Loader2, ArrowLeft, Sun, Moon } from "lucide-react";
+import { Loader2, ArrowLeft, Sun, Moon } from "lucide-react";
 import { useDarkMode } from "../components/theme/DarkModeProvider";
+import { useAuth } from "../components/auth/AuthProvider";
 
 // Importar as logos
 import logoWhite from "@/assets/img/ProntuPsi - Horizontal Principal Branco.svg";
@@ -16,33 +16,67 @@ import logoColor from "@/assets/img/ProntuPsi - Principal.svg";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  
-  const { signIn } = useAuth();
+  const [error, setError] = useState("");
+
+  const { signIn, authState, isAuthenticated, needsVerification, loading: authLoading } = useAuth();
   const { darkMode, toggleDarkMode } = useDarkMode();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Obter a página de origem (se houver)
+  // Redirecionar para a página de origem ou dashboard
   const from = location.state?.from?.pathname || "/dashboard";
+
+  console.log('🔧 Login: Estado de autenticação:', authState);
+  console.log('🔧 Login: isAuthenticated:', isAuthenticated);
+  console.log('🔧 Login: needsVerification:', needsVerification);
+
+  // Controle de redirecionamento baseado no estado
+  React.useEffect(() => {
+    if (authState === 'AUTHENTICATED') {
+      console.log('🔧 Login: Usuário autenticado e verificado, redirecionando para dashboard');
+      navigate(from, { replace: true });
+    }
+  }, [authState, navigate, from]);
+
+  // Mostrar loading enquanto inicializa
+  if (authState === 'INITIALIZING') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
+    console.log('🔧 Login: Iniciando login para:', email);
+
     try {
       const result = await signIn(email, password);
       
+      console.log('🔧 Login: Resultado:', result);
+      
       if (result.success) {
-        // Redirecionar para a página de origem ou dashboard
-        navigate(from, { replace: true });
-      } else {
+        console.log('🔧 Login: Login bem-sucedido');
+        // O redirecionamento será feito pelo useEffect baseado no authState
+                        } else if (result.requiresVerification) {
+                    console.log('🔧 Login: Email precisa de verificação, redirecionando...');
+                    
+                    // Forçar redirecionamento
+                    window.location.href = `/email-verification?email=${encodeURIComponent(result.email || email)}`;
+                  } else {
+        console.log('🔧 Login: Erro:', result.error);
         setError(result.error || "Erro ao fazer login");
       }
     } catch (err) {
+      console.error('🔧 Login: Erro interno:', err);
       setError("Erro interno do servidor");
     } finally {
       setLoading(false);
@@ -119,31 +153,15 @@ export default function Login() {
 
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Sua senha"
-                    required
-                    disabled={loading}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={loading}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Sua senha"
+                  required
+                  disabled={loading}
+                />
               </div>
 
               <Button
@@ -163,33 +181,16 @@ export default function Login() {
             </form>
 
             <div className="mt-6 text-center">
-              <Link
-                to="/signup"
-                className="text-sm text-blue-600 hover:text-blue-500"
-              >
-                Não tem uma conta? Cadastre-se
-              </Link>
-            </div>
-
-            {/* Links de ajuda */}
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex flex-col space-y-2 text-center">
-                <Link
-                  to="/recuperar-senha"
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors"
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Não tem uma conta?{" "}
+                <Button
+                  variant="link"
+                  className="p-0 h-auto font-semibold"
+                  onClick={() => navigate("/signup")}
                 >
-                  Esqueceu sua senha?
-                </Link>
-                <div className="flex items-center justify-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-                  <span>Precisa de ajuda?</span>
-                  <a
-                    href="mailto:suporte@prontupsi.com"
-                    className="text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors"
-                  >
-                    suporte@prontupsi.com
-                  </a>
-                </div>
-              </div>
+                  Cadastre-se
+                </Button>
+              </p>
             </div>
           </CardContent>
         </Card>

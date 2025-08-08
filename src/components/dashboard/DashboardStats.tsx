@@ -6,6 +6,7 @@ import { Calendar, Users, CreditCard, TrendingUp, TrendingDown } from 'lucide-re
 import { usePatients } from '@/hooks/usePatients';
 import { useAppointments } from '@/hooks/useAppointments';
 import { usePagamentos } from '@/hooks/usePagamentos';
+import { useFinancialVisibility } from '@/contexts/FinancialVisibilityContext';
 
 interface StatCardProps {
   title: string;
@@ -51,6 +52,7 @@ export function DashboardStats() {
   const { patients = [] } = usePatients();
   const { appointments = [] } = useAppointments();
   const { pagamentos = [] } = usePagamentos();
+  const { isFinancialVisible } = useFinancialVisibility();
 
 
 
@@ -134,7 +136,9 @@ export function DashboardStats() {
       },
       {
         title: "Receita Mensal",
-        value: `R$ ${totalRevenue30Days.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        value: isFinancialVisible 
+          ? `R$ ${totalRevenue30Days.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+          : "••••••••",
         description: recent30DaysPayments.length === 0 
           ? "Nenhum pagamento" 
           : `${recent30DaysPayments.length} pagamentos`,
@@ -142,7 +146,9 @@ export function DashboardStats() {
       },
       {
         title: "Previsão 7 dias",
-        value: `R$ ${weeklyForecast.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        value: isFinancialVisible 
+          ? `R$ ${weeklyForecast.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+          : "••••••••",
         description: weeklyPendingPayments.length === 0 
           ? "Nenhum pendente" 
           : `${weeklyPendingPayments.length} pendentes`,

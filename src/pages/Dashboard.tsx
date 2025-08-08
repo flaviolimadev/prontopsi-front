@@ -7,6 +7,7 @@ import { ActivePatients } from "@/components/dashboard/ActivePatients";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
 import { RecentPatients } from "@/components/dashboard/RecentPatients";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
+import { QuickLinksSection } from "@/components/dashboard/QuickLinksSection";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -79,6 +80,9 @@ export default function Dashboard() {
 
       {/* Stats Cards */}
       <DashboardStats />
+
+      {/* Quick Links Section - Agora um dos primeiros */}
+      <QuickLinksSection />
 
       {/* Main Content Grid */}
       <div className={cn(

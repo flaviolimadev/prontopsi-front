@@ -33,7 +33,7 @@ import logoColor from "@/assets/img/ProntuPsi - Principal.svg";
 import logoSymbol from "@/assets/img/Simbolo - Principal.svg";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: Home, description: "Visão geral" },
+      { name: "Painel", href: "/dashboard", icon: Home, description: "Visão geral" },
   { name: "Pacientes", href: "/pacientes", icon: Users, description: "Gerenciar pacientes" },
   { name: "Agenda", href: "/agenda", icon: Calendar, description: "Agendamentos" },
   { name: "Prontuários", href: "/prontuarios", icon: FileText, description: "Prontuários psicológicos" },

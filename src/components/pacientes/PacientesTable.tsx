@@ -24,7 +24,7 @@ import {
   ChevronsRight
 } from 'lucide-react';
 import { Paciente } from '@/hooks/usePacientes';
-import { PacienteForm } from './PacienteForm';
+import { EditPacienteModal } from './EditPacienteModal';
 
 interface PacientesTableProps {
   pacientes: Paciente[];
@@ -57,6 +57,8 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
@@ -90,8 +92,15 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
     navigate(`/pacientes/${paciente.id}`);
   };
 
-  const handleEditPaciente = async (paciente: Paciente) => {
-    await onEdit(paciente);
+  const handleEditPaciente = (paciente: Paciente) => {
+    setSelectedPaciente(paciente);
+    setEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (data: any) => {
+    if (selectedPaciente) {
+      await onEdit({ ...selectedPaciente, ...data });
+    }
   };
 
   const handleDeletePaciente = async (id: string) => {
@@ -211,23 +220,29 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
                         {formatDate(paciente.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewPaciente(paciente)}
+                            className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
                           >
                             <Eye className="w-4 h-4" />
+                            <span className="text-xs font-medium">Ver perfil</span>
                           </Button>
-                          <PacienteForm
-                            paciente={paciente}
-                            onSubmit={handleEditPaciente}
-                            mode="edit"
-                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditPaciente(paciente)}
+                            className="text-gray-600 hover:text-gray-700"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleStatusChange(paciente)}
+                            className="text-orange-600 hover:text-orange-700"
                           >
                             {paciente.status === 1 ? 'Desativar' : 'Ativar'}
                           </Button>
@@ -300,7 +315,16 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
         </Card>
       )}
 
-      
+      {/* Modal de Edição */}
+      {selectedPaciente && (
+        <EditPacienteModal
+          paciente={selectedPaciente}
+          open={editModalOpen}
+          onOpenChange={setEditModalOpen}
+          onSubmit={handleEditSubmit}
+          loading={loading}
+        />
+      )}
     </div>
   );
 }; 

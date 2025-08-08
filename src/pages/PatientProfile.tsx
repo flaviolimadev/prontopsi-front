@@ -93,6 +93,7 @@ import { apiService } from "@/services/api.service";
 import { useAgendaSessoesReal } from "@/hooks/useAgendaSessoesReal";
 import { usePagamentos } from "@/hooks/usePagamentos";
 import { useAddressSearch } from "@/hooks/useAddressSearch";
+import { useFinancialVisibility } from "@/contexts/FinancialVisibilityContext";
 
 export default function PatientProfile() {
   const { id: patientId } = useParams<{ id: string }>();
@@ -108,8 +109,13 @@ export default function PatientProfile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isMedicationModalOpen, setIsMedicationModalOpen] = useState(false);
+  const [isEmergencyContactModalOpen, setIsEmergencyContactModalOpen] = useState(false);
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [medications, setMedications] = useState<Array<{id: string, nome: string, prescricao: string}>>([]);
+  const [emergencyContacts, setEmergencyContacts] = useState<Array<{id: string, nome: string, telefone: string}>>([]);
   const [newMedication, setNewMedication] = useState({ nome: '', prescricao: '' });
+  const [newEmergencyContact, setNewEmergencyContact] = useState({ nome: '', telefone: '' });
+  const [notes, setNotes] = useState('');
 
   const {
     getPaciente,
@@ -124,6 +130,7 @@ export default function PatientProfile() {
   const { agendaSessoes } = useAgendaSessoesReal();
   const { pagamentos } = usePagamentos();
   const { loading: addressLoading, addressData, searchByCEP, searchByStreet, clearAddress } = useAddressSearch();
+  const { isFinancialVisible } = useFinancialVisibility();
 
   const [editForm, setEditForm] = useState({
     name: "",
@@ -201,6 +208,16 @@ export default function PatientProfile() {
       } else {
         setMedications([]);
       }
+      
+      // Carregar contatos de emergência
+      if (pacienteData.contatos_emergencia && Array.isArray(pacienteData.contatos_emergencia)) {
+        setEmergencyContacts(pacienteData.contatos_emergencia);
+      } else {
+        setEmergencyContacts([]);
+      }
+      
+      // Carregar observações
+      setNotes(pacienteData.observacao_geral || '');
       
       setEditForm({
         name: convertedPatient.name,
@@ -408,10 +425,10 @@ export default function PatientProfile() {
   };
 
   const handleAddMedication = async () => {
-    if (!newMedication.nome.trim() || !newMedication.prescricao.trim()) {
+    if (!newMedication.nome.trim()) {
       toast({
         title: "Erro",
-        description: "Nome e prescrição do medicamento são obrigatórios.",
+        description: "Nome do medicamento é obrigatório.",
         variant: "destructive",
       });
       return;
@@ -516,6 +533,97 @@ export default function PatientProfile() {
       toast({
         title: "Erro",
         description: "Erro ao remover medicamento.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddEmergencyContact = async () => {
+    if (!newEmergencyContact.nome.trim() || !newEmergencyContact.telefone.trim()) {
+      toast({
+        title: "Erro",
+        description: "Nome e telefone do contato de emergência são obrigatórios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const contactToAdd = {
+        id: Date.now().toString(),
+        nome: newEmergencyContact.nome.trim(),
+        telefone: newEmergencyContact.telefone.trim()
+      };
+
+      const updatedContacts = [...emergencyContacts, contactToAdd];
+      
+      const pacienteData = {
+        contatos_emergencia: updatedContacts
+      };
+
+      const result = await updatePaciente(patientId, pacienteData);
+      
+      setEmergencyContacts(updatedContacts);
+      setNewEmergencyContact({ nome: '', telefone: '' });
+      
+      toast({
+        title: "Sucesso",
+        description: "Contato de emergência adicionado com sucesso.",
+      });
+    } catch (error: any) {
+      console.error('Erro ao adicionar contato de emergência:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao adicionar contato de emergência.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveEmergencyContact = async (contactId: string) => {
+    try {
+      const updatedContacts = emergencyContacts.filter(contact => contact.id !== contactId);
+      
+      const pacienteData = {
+        contatos_emergencia: updatedContacts
+      };
+
+      const result = await updatePaciente(patientId, pacienteData);
+      
+      setEmergencyContacts(updatedContacts);
+      
+      toast({
+        title: "Sucesso",
+        description: "Contato de emergência removido com sucesso.",
+      });
+    } catch (error: any) {
+      console.error('Erro ao remover contato de emergência:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao remover contato de emergência.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    try {
+      const pacienteData = {
+        observacao_geral: notes.trim()
+      };
+
+      const result = await updatePaciente(patientId, pacienteData);
+      
+      toast({
+        title: "Sucesso",
+        description: "Observações salvas com sucesso.",
+      });
+      setIsNotesModalOpen(false);
+    } catch (error: any) {
+      console.error('Erro ao salvar observações:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar observações.",
         variant: "destructive",
       });
     }
@@ -664,36 +772,46 @@ export default function PatientProfile() {
               </div>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="lg" className="text-white/80 hover:text-white hover:bg-white/10">
-                  <MoreHorizontal className="h-6 w-6" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setIsEditModalOpen(true)}>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Editar Perfil
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleStatusChange}>
-                  {patient.status === "ativo" ? (
-                    <div key="desativar" className="flex items-center">
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Desativar Paciente
-                    </div>
-                  ) : (
-                    <div key="ativar" className="flex items-center">
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      Ativar Paciente
-                    </div>
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDeletePatient} className="text-red-600">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Deletar Paciente
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="lg" 
+                onClick={() => setIsEditModalOpen(true)}
+                className="text-white/80 hover:text-white hover:bg-white/10 flex items-center gap-2"
+              >
+                <Edit className="w-5 h-5" />
+                <span className="text-sm font-medium">Editar</span>
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                size="lg" 
+                onClick={handleStatusChange}
+                className="text-white/80 hover:text-white hover:bg-white/10 flex items-center gap-2"
+              >
+                {patient.status === "ativo" ? (
+                  <>
+                    <XCircle className="w-5 h-5" />
+                    <span className="text-sm font-medium">Desativar</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span className="text-sm font-medium">Ativar</span>
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                size="lg" 
+                onClick={handleDeletePatient}
+                className="text-white/80 hover:text-white hover:bg-white/10 flex items-center gap-2 hover:text-red-300"
+              >
+                <Trash2 className="w-5 h-5" />
+                <span className="text-sm font-medium">Deletar</span>
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -727,14 +845,17 @@ export default function PatientProfile() {
                 <div>
                   <p className="text-sm text-muted-foreground">Total Recebido</p>
                   <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                    {formatCurrency(
-                      patientFinancials
-                        .filter(f => f.status === "pago" || f.status === "confirmado")
-                        .reduce((sum, f) => {
-                          const amount = Number(f.amount) || 0;
-                          return sum + amount;
-                        }, 0)
-                    )}
+                    {isFinancialVisible 
+                      ? formatCurrency(
+                          patientFinancials
+                            .filter(f => f.status === "pago" || f.status === "confirmado")
+                            .reduce((sum, f) => {
+                              const amount = Number(f.amount) || 0;
+                              return sum + amount;
+                            }, 0)
+                        )
+                      : "••••••••"
+                    }
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {patientFinancials.filter(f => f.status === "pendente").length} pendentes
@@ -751,13 +872,10 @@ export default function PatientProfile() {
                   <FileText className="w-7 h-7 text-purple-500 dark:text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Prontuários</p>
-                  <p className="text-3xl font-bold">{patientRecords.length}</p>
+                  <p className="text-sm text-muted-foreground">Remarcações</p>
+                  <p className="text-3xl font-bold">0</p>
                   <p className="text-xs text-muted-foreground">
-                    {patientRecords.length > 0 
-                      ? `Último: ${format(new Date(patientRecords[0]?.created_at), "dd/MM/yy", { locale: ptBR })}`
-                      : "Nenhum registro"
-                    }
+                    Nenhuma remarcação
                   </p>
                 </div>
               </div>
@@ -772,12 +890,9 @@ export default function PatientProfile() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Arquivos</p>
-                  <p className="text-3xl font-bold">{patientFiles.length}</p>
+                  <p className="text-3xl font-bold">0</p>
                   <p className="text-xs text-muted-foreground">
-                    {patientFiles.length > 0 
-                      ? `${(patientFiles.reduce((sum, f) => sum + f.file_size, 0) / 1024 / 1024).toFixed(1)} MB`
-                      : "Nenhum arquivo"
-                    }
+                    Nenhum arquivo
                   </p>
                 </div>
               </div>
@@ -901,78 +1016,119 @@ export default function PatientProfile() {
                 </div>
                 
                 {/* Informações Médicas e Observações */}
-                {(patient.emergency_contact || patient.medication || patient.notes) && (
-                  <div key="medical-info">
-                    <Separator className="my-10" />
-                    <div className="space-y-8">
-                      <h4 className="font-bold text-xl flex items-center gap-3 text-primary border-b pb-3">
-                        <Heart className="w-6 h-6" />
-                        Informações Médicas e Observações
-                      </h4>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {patient.emergency_contact && (
-                          <div key="emergency-contact" className="flex items-start gap-4">
-                            <AlertCircle className="w-6 h-6 text-red-500 mt-1" />
-                            <div className="flex-1">
-                              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Contato de Emergência</p>
-                              <p className="text-lg font-semibold text-red-600">{patient.emergency_contact}</p>
-                            </div>
+                <div key="medical-info">
+                  <Separator className="my-10" />
+                  <div className="space-y-8">
+                    <h4 className="font-bold text-xl flex items-center gap-3 text-primary border-b pb-3">
+                      <Heart className="w-6 h-6" />
+                      Informações Médicas e Observações
+                    </h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <div className="flex items-start gap-4">
+                        <AlertCircle className="w-6 h-6 text-red-500 mt-1" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Contatos de Emergência</p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsEmergencyContactModalOpen(true)}
+                              className="text-xs"
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Gerenciar
+                            </Button>
                           </div>
-                        )}
-                        <div className="flex items-start gap-4">
-                          <Heart className="w-6 h-6 text-orange-500 mt-1" />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Medicações</p>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setIsMedicationModalOpen(true)}
-                                className="text-xs"
-                              >
-                                <Plus className="w-3 h-3 mr-1" />
-                                Gerenciar
-                              </Button>
-                            </div>
-                            {medications.length > 0 ? (
-                              <div className="space-y-2">
-                                {medications.map((med, idx) => (
-                                  <div key={med.id || idx} className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border border-orange-200 dark:border-orange-800/30">
-                                    <div className="flex items-start justify-between">
-                                      <div className="flex-1">
-                                        <p className="font-medium text-orange-900 dark:text-orange-100">{med.nome}</p>
-                                        <p className="text-sm text-orange-700 dark:text-orange-300">{med.prescricao}</p>
-                                      </div>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleRemoveMedication(med.id)}
-                                        className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-200"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
+                          {emergencyContacts.length > 0 ? (
+                            <div className="space-y-2">
+                              {emergencyContacts.map((contact, idx) => (
+                                <div key={contact.id || idx} className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 border border-red-200 dark:border-red-800/30">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <p className="font-medium text-red-900 dark:text-red-100">{contact.nome}</p>
+                                      <p className="text-sm text-red-700 dark:text-red-300">{contact.telefone}</p>
                                     </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRemoveEmergencyContact(contact.id)}
+                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
                                   </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-lg font-medium text-muted-foreground">Nenhuma medicação registrada</p>
-                            )}
-                          </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-lg font-medium text-muted-foreground">Nenhum contato de emergência registrado</p>
+                          )}
                         </div>
                       </div>
-                      {patient.notes && (
-                        <div key="notes" className="flex items-start gap-4 mt-6">
-                          <MessageSquare className="w-6 h-6 text-blue-500 mt-1" />
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Observações Gerais</p>
-                            <p className="text-lg font-medium leading-relaxed">{patient.notes}</p>
+                      <div className="flex items-start gap-4">
+                        <Heart className="w-6 h-6 text-orange-500 mt-1" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Medicações</p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsMedicationModalOpen(true)}
+                              className="text-xs"
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Gerenciar
+                            </Button>
                           </div>
+                          {medications.length > 0 ? (
+                            <div className="space-y-2">
+                              {medications.map((med, idx) => (
+                                <div key={med.id || idx} className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border border-orange-200 dark:border-orange-800/30">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <p className="font-medium text-orange-900 dark:text-orange-100">{med.nome}</p>
+                                      <p className="text-sm text-orange-700 dark:text-orange-300">{med.prescricao}</p>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRemoveMedication(med.id)}
+                                      className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-200"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-lg font-medium text-muted-foreground">Nenhuma medicação registrada</p>
+                          )}
                         </div>
-                      )}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4 mt-6">
+                      <MessageSquare className="w-6 h-6 text-blue-500 mt-1" />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Observações Gerais</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsNotesModalOpen(true)}
+                            className="text-xs"
+                          >
+                            <Edit className="w-3 h-3 mr-1" />
+                            Editar
+                          </Button>
+                        </div>
+                        <p className="text-lg font-medium leading-relaxed">
+                          {notes || "Nenhuma observação registrada"}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1117,11 +1273,14 @@ export default function PatientProfile() {
                             <span className="text-sm font-semibold text-green-800 dark:text-green-200">Total Pago</span>
                           </div>
                           <div className="text-xl font-bold text-green-900 dark:text-green-100">
-                            {formatCurrency(
-                              patientFinancials
-                                .filter(f => f.status === "pago" || f.status === "confirmado")
-                                .reduce((sum, f) => sum + f.amount, 0)
-                            )}
+                            {isFinancialVisible 
+                              ? formatCurrency(
+                                  patientFinancials
+                                    .filter(f => f.status === "pago" || f.status === "confirmado")
+                                    .reduce((sum, f) => sum + f.amount, 0)
+                                )
+                              : "••••••••"
+                            }
                           </div>
                         </CardContent>
                       </Card>
@@ -1133,14 +1292,17 @@ export default function PatientProfile() {
                             <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">Pendente</span>
                           </div>
                           <div className="text-xl font-bold text-yellow-900 dark:text-yellow-100">
-                            {formatCurrency(
-                              patientFinancials
-                                .filter(f => f.status === "pendente")
-                                .reduce((sum, f) => {
-                                  const amount = Number(f.amount) || 0;
-                                  return sum + amount;
-                                }, 0)
-                            )}
+                            {isFinancialVisible 
+                              ? formatCurrency(
+                                  patientFinancials
+                                    .filter(f => f.status === "pendente")
+                                    .reduce((sum, f) => {
+                                      const amount = Number(f.amount) || 0;
+                                      return sum + amount;
+                                    }, 0)
+                                )
+                              : "••••••••"
+                            }
                           </div>
                         </CardContent>
                       </Card>
@@ -1152,11 +1314,14 @@ export default function PatientProfile() {
                             <span className="text-sm font-semibold text-red-800 dark:text-red-200">Cancelado</span>
                           </div>
                           <div className="text-xl font-bold text-red-900 dark:text-red-100">
-                            {formatCurrency(
-                              patientFinancials
-                                .filter(f => f.status === "cancelado")
-                                .reduce((sum, f) => sum + f.amount, 0)
-                            )}
+                            {isFinancialVisible 
+                              ? formatCurrency(
+                                  patientFinancials
+                                    .filter(f => f.status === "cancelado")
+                                    .reduce((sum, f) => sum + f.amount, 0)
+                                )
+                              : "••••••••"
+                            }
                           </div>
                         </CardContent>
                       </Card>
@@ -1168,10 +1333,13 @@ export default function PatientProfile() {
                             <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">Total Geral</span>
                           </div>
                           <div className="text-xl font-bold text-blue-900 dark:text-blue-100">
-                            {formatCurrency(
-                              patientFinancials
-                                .reduce((sum, f) => sum + f.amount, 0)
-                            )}
+                            {isFinancialVisible 
+                              ? formatCurrency(
+                                  patientFinancials
+                                    .reduce((sum, f) => sum + f.amount, 0)
+                                )
+                              : "••••••••"
+                            }
                           </div>
                         </CardContent>
                       </Card>
@@ -1203,7 +1371,10 @@ export default function PatientProfile() {
                                 {payment.description}
                               </TableCell>
                               <TableCell className="font-bold">
-                                {formatCurrency(payment.amount)}
+                                {isFinancialVisible 
+                                  ? formatCurrency(payment.amount)
+                                  : "••••••••"
+                                }
                               </TableCell>
                               <TableCell>
                                 <Badge variant="outline" className="text-xs">
@@ -1493,7 +1664,7 @@ export default function PatientProfile() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="medication-prescription">Prescrição *</Label>
+                    <Label htmlFor="medication-prescription">Prescrição do Médico</Label>
                     <Textarea
                       id="medication-prescription"
                       placeholder="Ex: 1 comprimido de 500mg a cada 6 horas, com alimentos..."
@@ -1512,10 +1683,131 @@ export default function PatientProfile() {
               </Button>
               <Button 
                 onClick={handleAddMedication}
-                disabled={!newMedication.nome.trim() || !newMedication.prescricao.trim()}
+                disabled={!newMedication.nome.trim()}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Adicionar Medicamento
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Gerenciamento de Contatos de Emergência */}
+        <Dialog open={isEmergencyContactModalOpen} onOpenChange={setIsEmergencyContactModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                Gerenciar Contatos de Emergência
+              </DialogTitle>
+              <DialogDescription>
+                Adicione ou remova contatos de emergência do paciente
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              {/* Lista de contatos existentes */}
+              {emergencyContacts.length > 0 && (
+                <div key="existing-contacts" className="space-y-4">
+                  <h4 className="font-semibold text-sm">Contatos Atuais</h4>
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {emergencyContacts.map((contact, idx) => (
+                      <div key={contact.id || idx} className="bg-red-50 dark:bg-red-950/20 rounded-lg p-4 border border-red-200 dark:border-red-800/30">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium text-red-900 dark:text-red-100">{contact.nome}</p>
+                            <p className="text-sm text-red-700 dark:text-red-300 mt-1">{contact.telefone}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveEmergencyContact(contact.id)}
+                            className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Formulário para adicionar novo contato */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm">Adicionar Novo Contato</h4>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-name">Nome do Responsável *</Label>
+                    <Input
+                      id="contact-name"
+                      placeholder="Ex: Maria Silva, João Santos..."
+                      value={newEmergencyContact.nome}
+                      onChange={(e) => setNewEmergencyContact({ ...newEmergencyContact, nome: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-phone">Telefone *</Label>
+                    <Input
+                      id="contact-phone"
+                      placeholder="Ex: (11) 99999-9999"
+                      value={newEmergencyContact.telefone}
+                      onChange={(e) => setNewEmergencyContact({ ...newEmergencyContact, telefone: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEmergencyContactModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleAddEmergencyContact}
+                disabled={!newEmergencyContact.nome.trim() || !newEmergencyContact.telefone.trim()}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar Contato
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Edição de Observações */}
+        <Dialog open={isNotesModalOpen} onOpenChange={setIsNotesModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-blue-500" />
+                Editar Observações Gerais
+              </DialogTitle>
+              <DialogDescription>
+                Adicione ou edite observações gerais sobre o paciente
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="notes">Observações Gerais</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Digite aqui as observações gerais sobre o paciente..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={8}
+                  className="resize-none"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsNotesModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveNotes}>
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Observações
               </Button>
             </DialogFooter>
           </DialogContent>

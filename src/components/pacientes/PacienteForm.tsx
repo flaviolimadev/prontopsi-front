@@ -252,8 +252,7 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
                     <SelectContent>
                       <SelectItem value="Masculino">Masculino</SelectItem>
                       <SelectItem value="Feminino">Feminino</SelectItem>
-                      <SelectItem value="Não-binário">Não-binário</SelectItem>
-                      <SelectItem value="Prefere não informar">Prefere não informar</SelectItem>
+                      <SelectItem value="Prefiro não informar">Prefiro não informar</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -345,8 +344,7 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
                      <SelectContent>
                        <SelectItem value="Masculino">Masculino</SelectItem>
                        <SelectItem value="Feminino">Feminino</SelectItem>
-                       <SelectItem value="Não-binário">Não-binário</SelectItem>
-                       <SelectItem value="Prefere não informar">Prefere não informar</SelectItem>
+                       <SelectItem value="Prefiro não informar">Prefiro não informar</SelectItem>
                      </SelectContent>
                    </Select>
                  </div>

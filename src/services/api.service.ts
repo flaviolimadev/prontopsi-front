@@ -4,8 +4,12 @@ class ApiService {
   private api: AxiosInstance;
 
   constructor() {
+    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    console.log('🔧 API Service - Base URL:', baseURL);
+    console.log('🔧 API Service - VITE_API_URL:', import.meta.env.VITE_API_URL);
+    
     this.api = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+      baseURL,
       timeout: 30000, // Aumentar timeout para 30 segundos
       headers: {
         'Content-Type': 'application/json',
@@ -13,29 +17,51 @@ class ApiService {
     });
 
     // Interceptor para adicionar token de autenticação
-    this.api.interceptors.request.use(
-      (config) => {
-        const token = localStorage.getItem('auth_token');
-        console.log('Interceptor - Token encontrado:', token ? 'Sim' : 'Não');
-        console.log('Interceptor - URL da requisição:', config.url);
-        console.log('Interceptor - Método:', config.method);
-        
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-          console.log('Interceptor - Token adicionado ao header');
-        }
-        
-        // Não sobrescrever Content-Type para multipart/form-data
-        if (config.headers['Content-Type'] === 'multipart/form-data') {
-          delete config.headers['Content-Type'];
-        }
-        
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
+      this.api.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem('auth_token');
+      
+
+      
+      // Lista de rotas públicas que não precisam de autenticação
+      const publicRoutes = [
+        '/auth/login',
+        '/auth/register',
+        '/auth/verify-email',
+        '/auth/resend-verification',
+        '/cadastro-links/public/',
+        '/cadastro-links/public/submit'
+      ];
+      
+      // Verificar se a rota atual é pública
+      const isPublicRoute = publicRoutes.some(route => 
+        config.url?.includes(route)
+      );
+      
+
+      
+      // Log para debug
+      if (config.url?.includes('/cadastro-links/public/')) {
+        console.log('🔍 Rota pública detectada:', config.url);
+        console.log('🔍 Token será adicionado:', !isPublicRoute);
       }
-    );
+      
+      // Só adicionar token se não for rota pública
+      if (token && !isPublicRoute) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      
+      // Não sobrescrever Content-Type para multipart/form-data
+      if (config.headers['Content-Type'] === 'multipart/form-data') {
+        delete config.headers['Content-Type'];
+      }
+      
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
+    }
+  );
 
     // Interceptor para tratar respostas
     this.api.interceptors.response.use(
@@ -82,18 +108,29 @@ class ApiService {
 
   // Métodos específicos para autenticação
   async login(email: string, password: string) {
-    return this.post<{ token: string; user: any }>('/auth/login', {
+    return this.post<{ token: string; user: { emailVerified: boolean; [key: string]: any } }>('/auth/login', {
       email,
       password,
     });
   }
 
   async register(userData: any) {
-    return this.post<{ token: string; user: any }>('/auth/register', userData);
+    return this.post<{ token?: string; user?: any; message?: string; requiresVerification?: boolean }>('/auth/register', userData);
   }
 
   async logout() {
     return this.post('/auth/logout');
+  }
+
+  async verifyEmail(email: string, verificationCode: string) {
+    return this.post<{ token: string; user: any; message: string }>('/auth/verify-email', {
+      email,
+      verificationCode
+    });
+  }
+
+  async resendVerificationCode(email: string) {
+    return this.post<{ message: string }>('/auth/resend-verification', { email });
   }
 
   // Métodos para usuários
@@ -486,6 +523,47 @@ class ApiService {
   // Estatísticas dos pagamentos
   async getPagamentosStatistics() {
     return this.get<any>('/pagamentos/statistics/overview');
+  }
+
+  // ===== CADASTRO LINKS =====
+
+  // Links de cadastro (protegidos)
+  async getCadastroLinks() {
+    return this.get<any>('/cadastro-links');
+  }
+
+  async createCadastroLink(data: any) {
+    return this.post<any>('/cadastro-links', data);
+  }
+
+  async updateCadastroLink(id: string, data: any) {
+    return this.put<any>(`/cadastro-links/${id}`, data);
+  }
+
+  async deleteCadastroLink(id: string) {
+    return this.delete<any>(`/cadastro-links/${id}`);
+  }
+
+  // Submissões (protegidas)
+  async getCadastroSubmissions() {
+    return this.get<any>('/cadastro-links/submissions/all');
+  }
+
+  async approveCadastroSubmission(id: string, data: any) {
+    return this.put<any>(`/cadastro-links/submissions/${id}/approve`, data);
+  }
+
+  async rejectCadastroSubmission(id: string, data: any) {
+    return this.put<any>(`/cadastro-links/submissions/${id}/reject`, data);
+  }
+
+  // Links públicos (sem autenticação)
+  async getPublicCadastroLink(token: string) {
+    return this.get<any>(`/cadastro-links/public/${token}`);
+  }
+
+  async createPublicCadastroSubmission(data: any) {
+    return this.post<any>('/cadastro-links/public/submit', data);
   }
 }
 

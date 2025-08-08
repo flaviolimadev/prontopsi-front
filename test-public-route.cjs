@@ -1,0 +1,25 @@
+console.log('🔧 TESTE PUBLIC ROUTE - USUÁRIOS AUTENTICADOS\n');
+
+console.log('📋 REGRA IMPLEMENTADA:');
+console.log('Usuários autenticados NÃO podem acessar:');
+console.log('- /login');
+console.log('- /signup');
+console.log('');
+console.log('✅ MUDANÇAS APLICADAS:');
+console.log('- Login e SignUp agora usam PublicRoute');
+console.log('- PublicRoute redireciona usuários autenticados para /dashboard');
+console.log('- PublicRoute permite acesso a usuários não autenticados');
+console.log('');
+console.log('🧪 TESTE:');
+console.log('1. Faça login com um usuário verificado');
+console.log('2. Tente acessar: http://localhost:8080/login');
+console.log('3. Deve redirecionar automaticamente para /dashboard');
+console.log('4. Tente acessar: http://localhost:8080/signup');
+console.log('5. Deve redirecionar automaticamente para /dashboard');
+console.log('');
+console.log('✅ FUNCIONAMENTO ESPERADO:');
+console.log('- Usuários autenticados: Redirecionados para dashboard');
+console.log('- Usuários não autenticados: Podem acessar login/signup');
+console.log('- Usuários não verificados: Podem acessar login/signup');
+console.log('');
+console.log('🎯 TESTE AGORA!');

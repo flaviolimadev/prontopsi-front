@@ -3,13 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar } from "@/components/ui/calendar";
+
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarDays, Clock, User, Plus, Edit, Trash2, RefreshCw, AlertCircle, Repeat, ChevronLeft, ChevronRight, ExternalLink, Calendar as CalendarIcon, MapPin, Clock as ClockIcon, Search, Filter, X, CreditCard, DollarSign, CheckCircle, CheckCircle2 } from "lucide-react";
+import { CalendarDays, Clock, User, Plus, Edit, Trash2, RefreshCw, AlertCircle, Repeat, ChevronLeft, ChevronRight, ExternalLink, Calendar, MapPin, Clock as ClockIcon, Search, Filter, X, CreditCard, DollarSign, CheckCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAgendaSessoes } from "@/hooks/useAgendaSessoes";
 import { usePacientes } from "@/hooks/usePacientes";
@@ -38,8 +38,9 @@ interface AppointmentFormData {
 interface RecurringAppointmentData {
   isRecurring: boolean;
   frequency: 'weekly' | 'biweekly' | 'monthly';
-  dayOfWeek?: number; // 0 = Domingo, 1 = Segunda, etc.
-  quantity: number;
+  daysOfWeek: number[]; // Array de dias da semana (0 = Domingo, 1 = Segunda, etc.)
+  quantity: number; // Quantidade de sessões por dia selecionado
+  daySchedules: { [key: number]: string }; // Horários específicos para cada dia (0-6)
 }
 
 export default function Agenda() {
@@ -142,8 +143,9 @@ export default function Agenda() {
   const [recurringData, setRecurringData] = useState<RecurringAppointmentData>({
     isRecurring: false,
     frequency: 'weekly',
-    dayOfWeek: new Date().getDay(),
-    quantity: 1
+    daysOfWeek: [new Date().getDay()], // Dia atual por padrão
+    quantity: 1,
+    daySchedules: {} // Horários específicos para cada dia
   });
 
   // Filtrar apenas pacientes ativos
@@ -295,14 +297,24 @@ export default function Agenda() {
   }
 
   const handleCreateAppointment = async () => {
-    if (!formData.pacienteId || !formData.data || !formData.horario) {
-      toast({
-        title: "Erro",
-        description: "Por favor, preencha todos os campos obrigatórios.",
-        variant: "destructive"
-      });
-      return;
-    }
+          if (!formData.pacienteId || !formData.data) {
+        toast({
+          title: "Erro",
+          description: "Por favor, preencha o paciente e a data.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validação específica para agendamento único
+      if (!recurringData.isRecurring && !formData.horario) {
+        toast({
+          title: "Erro",
+          description: "Por favor, preencha o horário da consulta.",
+          variant: "destructive"
+        });
+        return;
+      }
 
     // Validar pagamento
     if (formData.tipoPagamento === 'avulso' && (!formData.valorAvulso || formData.valorAvulso <= 0)) {
@@ -323,10 +335,10 @@ export default function Agenda() {
       return;
     }
 
-    if (recurringData.isRecurring && (!recurringData.dayOfWeek || recurringData.quantity < 1)) {
+          if (recurringData.isRecurring && (recurringData.daysOfWeek.length === 0 || recurringData.quantity < 1)) {
       toast({
         title: "Erro",
-        description: "Para agendamento recorrente, preencha o dia da semana e a quantidade de sessões.",
+        description: "Para agendamento recorrente, selecione os dias da semana e a quantidade de sessões por dia.",
         variant: "destructive"
       });
       return;
@@ -345,17 +357,19 @@ export default function Agenda() {
       if (recurringData.isRecurring) {
         // Criar múltiplas consultas recorrentes
         const startDate = new Date(formData.data + 'T00:00:00');
-        const dates = calculateRecurringDates(
+        const recurringAppointments = calculateRecurringDates(
           startDate,
           recurringData.frequency,
-          recurringData.dayOfWeek!,
-          recurringData.quantity
+          recurringData.daysOfWeek,
+          recurringData.quantity,
+          recurringData.daySchedules
         );
 
-        const promises = dates.map(async date => {
+        const promises = recurringAppointments.map(async appointment => {
           const appointmentData = {
             ...formData,
-            data: formatDateToYYYYMMDD(date)
+            data: formatDateToYYYYMMDD(appointment.date),
+            horario: appointment.time
           };
           
           // Criar a sessão
@@ -366,12 +380,12 @@ export default function Agenda() {
             pacienteId: formData.pacienteId,
             pacoteId: formData.tipoPagamento === 'pacote' ? formData.pacoteId : null,
             agendaSessaoId: session.id, // Vincular ao ID da agenda criada
-            data: formatDateToYYYYMMDD(date),
-            vencimento: formatDateToYYYYMMDD(date), // Vencimento no mesmo dia da consulta
+            data: formatDateToYYYYMMDD(appointment.date),
+            vencimento: formatDateToYYYYMMDD(appointment.date), // Vencimento no mesmo dia da consulta
             value: formData.tipoPagamento === 'pacote' 
               ? Number(pacotes?.find(p => p.id === formData.pacoteId)?.value || 0)
               : Number(formData.valorAvulso || 0),
-            descricao: `Pagamento para consulta em ${date.toLocaleDateString('pt-BR')} - ${formData.tipoDaConsulta}`,
+            descricao: `Pagamento para consulta em ${appointment.date.toLocaleDateString('pt-BR')} - ${formData.tipoDaConsulta}`,
             type: null, // Será definido quando o pagamento for realizado
             txid: null
           };
@@ -526,30 +540,39 @@ export default function Agenda() {
   };
 
   // Função para calcular datas recorrentes
-  const calculateRecurringDates = (startDate: Date, frequency: string, dayOfWeek: number, quantity: number): Date[] => {
-    const dates: Date[] = [];
-    const currentDate = new Date(startDate);
+  const calculateRecurringDates = (startDate: Date, frequency: string, daysOfWeek: number[], quantity: number, daySchedules: { [key: number]: string }): Array<{date: Date, time: string}> => {
+    const appointments: Array<{date: Date, time: string}> = [];
     
-    // Ajustar para o dia da semana desejado
-    while (currentDate.getDay() !== dayOfWeek) {
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-    
-    for (let i = 0; i < quantity; i++) {
-      const newDate = new Date(currentDate);
-      dates.push(newDate);
+    // Para cada dia da semana selecionado
+    for (const dayOfWeek of daysOfWeek) {
+      const currentDate = new Date(startDate);
       
-      // Calcular próxima data baseada na frequência
-      if (frequency === 'weekly') {
-        currentDate.setDate(currentDate.getDate() + 7);
-      } else if (frequency === 'biweekly') {
-        currentDate.setDate(currentDate.getDate() + 14);
-      } else if (frequency === 'monthly') {
-        currentDate.setMonth(currentDate.getMonth() + 1);
+      // Encontrar o próximo dia da semana
+      while (currentDate.getDay() !== dayOfWeek) {
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      // Usar horário específico do dia ou horário padrão
+      const dayTime = daySchedules[dayOfWeek] || '09:00';
+      
+      // Criar as sessões para este dia da semana
+      for (let i = 0; i < quantity; i++) {
+        const newDate = new Date(currentDate);
+        appointments.push({ date: newDate, time: dayTime });
+        
+        // Avançar para a próxima data baseada na frequência
+        if (frequency === 'weekly') {
+          currentDate.setDate(currentDate.getDate() + 7);
+        } else if (frequency === 'biweekly') {
+          currentDate.setDate(currentDate.getDate() + 14);
+        } else if (frequency === 'monthly') {
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
       }
     }
     
-    return dates;
+    // Ordenar as datas
+    return appointments.sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
   // Função para gerar o calendário do mês
@@ -778,6 +801,33 @@ export default function Agenda() {
     }).format(value);
   };
 
+  // Função para formatar valor de entrada (100 -> 1,00)
+  const formatCurrencyInput = (value: string): string => {
+    // Remove tudo que não é número
+    const numericValue = value.replace(/\D/g, '');
+    
+    if (numericValue === '') return '';
+    
+    // Converte para centavos (100 -> 1.00)
+    const cents = parseInt(numericValue);
+    const reais = cents / 100;
+    
+    // Formata como moeda brasileira
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(reais);
+  };
+
+  // Função para converter valor formatado de volta para número
+  const parseCurrencyInput = (value: string): number => {
+    // Remove símbolos de moeda e espaços
+    const cleanValue = value.replace(/[R$\s.]/g, '').replace(',', '.');
+    return parseFloat(cleanValue) || 0;
+  };
+
   const handlePagamentoValueChange = (value: string) => {
     const numericValue = value.replace(/[^\d,]/g, '').replace(',', '.');
     setPagamentoForm(prev => ({ ...prev, value: parseFloat(numericValue) || 0 }));
@@ -848,8 +898,9 @@ export default function Agenda() {
             setRecurringData({
               isRecurring: false,
               frequency: 'weekly',
-              dayOfWeek: new Date().getDay(),
-              quantity: 1
+              daysOfWeek: [new Date().getDay()],
+              quantity: 1,
+              daySchedules: {}
             });
           }
         }}>
@@ -859,7 +910,7 @@ export default function Agenda() {
               Nova Consulta
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Agendar Nova Consulta</DialogTitle>
               <DialogDescription>
@@ -886,39 +937,29 @@ export default function Agenda() {
                   </Select>
                 )}
               </div>
+              {!recurringData.isRecurring && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Data *</Label>
+                    <Input
+                      type="date"
+                      value={formData.data}
+                      onChange={(e) => setFormData({...formData, data: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Horário *</Label>
+                    <Input
+                      type="time"
+                      value={formData.horario}
+                      onChange={(e) => setFormData({...formData, horario: e.target.value})}
+                    />
+                  </div>
+                </div>
+              )}
+              
+
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Data *</Label>
-                  <Input
-                    type="date"
-                    value={formData.data}
-                    onChange={(e) => setFormData({...formData, data: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Horário *</Label>
-                  <Input
-                    type="time"
-                    value={formData.horario}
-                    onChange={(e) => setFormData({...formData, horario: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Tipo da Consulta</Label>
-                  <Select value={formData.tipoDaConsulta} onValueChange={(value: any) => setFormData({...formData, tipoDaConsulta: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Consulta">Consulta</SelectItem>
-                      <SelectItem value="Avaliação">Avaliação</SelectItem>
-                      <SelectItem value="Retorno">Retorno</SelectItem>
-                      <SelectItem value="Grupo">Grupo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="space-y-2">
                   <Label>Modalidade</Label>
                   <Select value={formData.modalidade} onValueChange={(value: any) => setFormData({...formData, modalidade: value})}>
@@ -931,54 +972,48 @@ export default function Agenda() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Tipo de Atendimento</Label>
-                <Select value={formData.tipoAtendimento} onValueChange={(value: any) => setFormData({...formData, tipoAtendimento: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Individual">Individual</SelectItem>
-                    <SelectItem value="Casal">Casal</SelectItem>
-                    <SelectItem value="Grupo">Grupo</SelectItem>
-                    <SelectItem value="Família">Família</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Duração (minutos)</Label>
-                <Input
-                  type="number"
-                  value={formData.duracao}
-                  onChange={(e) => setFormData({...formData, duracao: parseInt(e.target.value) || 50})}
-                />
+                <div className="space-y-2">
+                  <Label>Tipo de Atendimento</Label>
+                  <Select value={formData.tipoAtendimento} onValueChange={(value: any) => setFormData({...formData, tipoAtendimento: value})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Individual">Individual</SelectItem>
+                      <SelectItem value="Casal">Casal</SelectItem>
+                      <SelectItem value="Grupo">Grupo</SelectItem>
+                      <SelectItem value="Família">Família</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               
-              {/* Agendamento Recorrente */}
-              <div className="space-y-3 border-t pt-4">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="recurring"
-                    checked={recurringData.isRecurring}
-                    onChange={(e) => setRecurringData({
-                      ...recurringData,
-                      isRecurring: e.target.checked
-                    })}
-                    className="rounded"
-                  />
-                  <Label htmlFor="recurring" className="font-medium flex items-center gap-2">
-                    <Repeat className="w-4 h-4" />
-                    Agendamento Recorrente
-                  </Label>
-                </div>
-                
-                {recurringData.isRecurring && (
-                  <div className="space-y-3 pl-6">
-                    <div className="grid grid-cols-2 gap-4">
+              {/* Agendamento Recorrente e Pagamento - Layout Compacto */}
+              <div className="space-y-4 border-t pt-4">
+                {/* Agendamento Recorrente */}
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="recurring"
+                      checked={recurringData.isRecurring}
+                      onChange={(e) => setRecurringData({
+                        ...recurringData,
+                        isRecurring: e.target.checked
+                      })}
+                      className="rounded"
+                    />
+                    <Label htmlFor="recurring" className="font-medium flex items-center gap-2">
+                      <Repeat className="w-4 h-4" />
+                      Agendamento Recorrente
+                    </Label>
+                  </div>
+                  
+                  {recurringData.isRecurring && (
+                    <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
+                      {/* Frequência */}
                       <div className="space-y-2">
-                        <Label>Frequência</Label>
+                        <Label className="text-sm font-medium">Frequência</Label>
                         <Select 
                           value={recurringData.frequency} 
                           onValueChange={(value: 'weekly' | 'biweekly' | 'monthly') => setRecurringData({
@@ -986,7 +1021,7 @@ export default function Agenda() {
                             frequency: value
                           })}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-9">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -996,148 +1031,279 @@ export default function Agenda() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Dia da Semana</Label>
-                        <Select 
-                          value={recurringData.dayOfWeek?.toString()} 
-                          onValueChange={(value) => setRecurringData({
-                            ...recurringData,
-                            dayOfWeek: parseInt(value)
-                          })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0">Domingo</SelectItem>
-                            <SelectItem value="1">Segunda-feira</SelectItem>
-                            <SelectItem value="2">Terça-feira</SelectItem>
-                            <SelectItem value="3">Quarta-feira</SelectItem>
-                            <SelectItem value="4">Quinta-feira</SelectItem>
-                            <SelectItem value="5">Sexta-feira</SelectItem>
-                            <SelectItem value="6">Sábado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Quantidade de Sessões</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="52"
-                        value={recurringData.quantity}
-                        onChange={(e) => setRecurringData({
-                          ...recurringData,
-                          quantity: parseInt(e.target.value) || 1
-                        })}
-                        placeholder="Ex: 5"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Seção de Pagamento */}
-              <div className="space-y-3 border-t pt-4">
-                <Label className="text-base font-medium">Pagamento</Label>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        id="tipo-avulso"
-                        name="tipoPagamento"
-                        value="avulso"
-                        checked={formData.tipoPagamento === 'avulso'}
-                        onChange={(e) => setFormData({
-                          ...formData, 
-                          tipoPagamento: e.target.value as 'pacote' | 'avulso',
-                          pacoteId: null
-                        })}
-                        className="rounded"
-                      />
-                      <Label htmlFor="tipo-avulso" className="text-sm">Valor Avulso</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        id="tipo-pacote"
-                        name="tipoPagamento"
-                        value="pacote"
-                        checked={formData.tipoPagamento === 'pacote'}
-                        onChange={(e) => setFormData({
-                          ...formData, 
-                          tipoPagamento: e.target.value as 'pacote' | 'avulso',
-                          valorAvulso: 0
-                        })}
-                        className="rounded"
-                      />
-                      <Label htmlFor="tipo-pacote" className="text-sm">Pacote</Label>
-                    </div>
-                  </div>
-
-                  {formData.tipoPagamento === 'avulso' && (
-                    <div className="space-y-2">
-                      <Label>Valor da Consulta (R$)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0,00"
-                        value={formData.valorAvulso || ''}
-                        onChange={(e) => setFormData({
-                          ...formData, 
-                          valorAvulso: parseFloat(e.target.value) || 0
-                        })}
-                      />
-                    </div>
-                  )}
-
-                  {formData.tipoPagamento === 'pacote' && (
-                    <div className="space-y-2">
-                      <Label>Selecionar Pacote</Label>
-                      {pacotesLoading ? (
-                        <div className="h-10 w-full bg-muted animate-pulse rounded" />
-                      ) : pacotes?.filter(pacote => pacote.ativo).length === 0 ? (
-                        <div className="p-3 bg-muted rounded-md border">
-                          <p className="text-sm text-muted-foreground">
-                            Nenhum pacote ativo encontrado. 
-                            <br />
-                            Crie pacotes na página Financeiro para poder selecioná-los aqui.
-                          </p>
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Dias da Semana</Label>
+                        <div className="grid grid-cols-7 gap-2">
+                          {[
+                            { value: 0, label: 'Dom', short: 'D' },
+                            { value: 1, label: 'Seg', short: 'S' },
+                            { value: 2, label: 'Ter', short: 'T' },
+                            { value: 3, label: 'Qua', short: 'Q' },
+                            { value: 4, label: 'Qui', short: 'Q' },
+                            { value: 5, label: 'Sex', short: 'S' },
+                            { value: 6, label: 'Sáb', short: 'S' }
+                          ].map((day) => (
+                            <div key={day.value} className="flex flex-col items-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentDays = recurringData.daysOfWeek || [];
+                                  const newDays = currentDays.includes(day.value)
+                                    ? currentDays.filter(d => d !== day.value)
+                                    : [...currentDays, day.value];
+                                  setRecurringData({
+                                    ...recurringData,
+                                    daysOfWeek: newDays
+                                  });
+                                }}
+                                className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center text-sm font-medium transition-all duration-200 ${
+                                  (recurringData.daysOfWeek || []).includes(day.value)
+                                    ? 'bg-blue-500 border-blue-500 text-white shadow-md'
+                                    : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20'
+                                }`}
+                              >
+                                {day.short}
+                              </button>
+                              <span className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                {day.label}
+                              </span>
+                            </div>
+                  ))}
                         </div>
-                      ) : (
-                        <Select 
-                          value={formData.pacoteId || ''} 
-                          onValueChange={(value) => setFormData({...formData, pacoteId: value})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione um pacote" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {pacotes?.filter(pacote => pacote.ativo).map((pacote) => (
-                              <SelectItem key={pacote.id} value={pacote.id}>
-                                {pacote.title} - R$ {Number(pacote.value || 0).toFixed(2)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {(recurringData.daysOfWeek || []).length === 0 && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            Selecione pelo menos um dia da semana
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm font-medium">Quantidade de Sessões</Label>
+                          <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">
+                            Criar automaticamente
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            type="number"
+                            min="1"
+                            max="52"
+                            value={recurringData.quantity}
+                            onChange={(e) => setRecurringData({
+                              ...recurringData,
+                              quantity: parseInt(e.target.value) || 1
+                            })}
+                            placeholder="Ex: 10"
+                            className="h-9 flex-1"
+                          />
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            {recurringData.quantity > 0 && (recurringData.daysOfWeek || []).length > 0 && (
+                              <span>
+                                = {recurringData.quantity * (recurringData.daysOfWeek || []).length} agendamentos
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Serão criados automaticamente {recurringData.quantity} sessões para cada dia selecionado
+                        </p>
+                      </div>
+
+                      {/* Horários Específicos por Dia */}
+                      {(recurringData.daysOfWeek || []).length > 0 && (
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium">Horários por Dia</Label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {(recurringData.daysOfWeek || []).map((dayValue) => {
+                              const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                              const dayName = dayNames[dayValue];
+                              const currentTime = recurringData.daySchedules[dayValue] || formData.horario || '09:00';
+                              
+                              return (
+                                <div key={dayValue} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                  <div className="flex-1">
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                      {dayName}
+                                    </span>
+                                  </div>
+                                  <Input
+                                    type="time"
+                                    value={currentTime}
+                                    onChange={(e) => setRecurringData({
+                                      ...recurringData,
+                                      daySchedules: {
+                                        ...recurringData.daySchedules,
+                                        [dayValue]: e.target.value
+                                      }
+                                    })}
+                                    className="w-24 h-9 text-sm"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
+
+                {/* Seção de Pagamento - Design Moderno */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                      <CreditCard className="w-4 h-4 text-white" />
+                    </div>
+                    <Label className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                      Forma de Pagamento
+                    </Label>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Opção Valor Avulso */}
+                    <div 
+                      className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:shadow-md ${
+                        formData.tipoPagamento === 'avulso' 
+                          ? 'border-green-500 bg-green-50 dark:bg-green-950/20 shadow-sm' 
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
+                      onClick={() => setFormData({
+                        ...formData, 
+                        tipoPagamento: 'avulso',
+                        pacoteId: null
+                      })}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          formData.tipoPagamento === 'avulso' 
+                            ? 'border-green-500 bg-green-500' 
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}>
+                          {formData.tipoPagamento === 'avulso' && (
+                            <div className="w-2 h-2 bg-white rounded-full" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <DollarSign className="w-4 h-4 text-green-600" />
+                            <span className="font-medium text-sm">Valor Avulso</span>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Definir valor individual</p>
+                        </div>
+                      </div>
+                      
+                                              {formData.tipoPagamento === 'avulso' && (
+                          <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800">
+                            <Input
+                              type="text"
+                              placeholder="R$ 0,00"
+                              value={formData.valorAvulso ? formatCurrencyInput((formData.valorAvulso * 100).toString()) : ''}
+                              onChange={(e) => {
+                                const rawValue = e.target.value.replace(/\D/g, '');
+                                if (rawValue === '') {
+                                  setFormData({
+                                    ...formData, 
+                                    valorAvulso: 0
+                                  });
+                                } else {
+                                  const numericValue = parseInt(rawValue) / 100;
+                                  setFormData({
+                                    ...formData, 
+                                    valorAvulso: numericValue
+                                  });
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const rawValue = e.target.value.replace(/\D/g, '');
+                                if (rawValue !== '') {
+                                  const numericValue = parseInt(rawValue) / 100;
+                                  e.target.value = formatCurrencyInput((numericValue * 100).toString());
+                                }
+                              }}
+                              className="h-9 text-sm border-green-300 focus:border-green-500 focus:ring-blue-500"
+                            />
+                          </div>
+                        )}
+                    </div>
+
+                    {/* Opção Pacote */}
+                    <div 
+                      className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:shadow-md ${
+                        formData.tipoPagamento === 'pacote' 
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20 shadow-sm' 
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
+                      onClick={() => setFormData({
+                        ...formData, 
+                        tipoPagamento: 'pacote',
+                        valorAvulso: 0
+                      })}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          formData.tipoPagamento === 'pacote' 
+                            ? 'border-blue-500 bg-blue-500' 
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}>
+                          {formData.tipoPagamento === 'pacote' && (
+                            <div className="w-2 h-2 bg-white rounded-full" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                            <span className="font-medium text-sm">Pacote</span>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Usar pacote existente</p>
+                        </div>
+                      </div>
+                      
+                      {formData.tipoPagamento === 'pacote' && (
+                        <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+                          {pacotesLoading ? (
+                            <div className="h-9 w-full bg-muted animate-pulse rounded" />
+                          ) : pacotes?.filter(pacote => pacote.ativo).length === 0 ? (
+                            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                              <div className="flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4 text-amber-600" />
+                                <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                                  Nenhum pacote ativo
+                                </span>
+                              </div>
+                              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                Crie pacotes no Financeiro
+                              </p>
+                            </div>
+                          ) : (
+                            <Select 
+                              value={formData.pacoteId || ''} 
+                              onValueChange={(value) => setFormData({...formData, pacoteId: value})}
+                            >
+                              <SelectTrigger className="h-9 text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500">
+                                <SelectValue placeholder="Escolher pacote" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {pacotes?.filter(pacote => pacote.ativo).map((pacote) => (
+                                  <SelectItem key={pacote.id} value={pacote.id}>
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>{pacote.title}</span>
+                                      <span className="text-green-600 font-medium">
+                                        R$ {Number(pacote.value || 0).toFixed(2)}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Observações</Label>
-                <Textarea
-                  placeholder="Observações sobre a consulta..."
-                  value={formData.observacao}
-                  onChange={(e) => setFormData({...formData, observacao: e.target.value})}
-                />
-              </div>
+
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
                   Cancelar
@@ -1570,7 +1736,7 @@ export default function Agenda() {
                               <span>{appointment.horario}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <CalendarIcon className="w-4 h-4" />
+                              <Calendar className="w-4 h-4" />
                               <span>{appointment.duracao}min</span>
                             </div>
                           </div>
@@ -1682,7 +1848,7 @@ export default function Agenda() {
 
       {/* Edit Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Consulta</DialogTitle>
             <DialogDescription>
@@ -1725,20 +1891,6 @@ export default function Agenda() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Tipo da Consulta</Label>
-                <Select value={formData.tipoDaConsulta} onValueChange={(value: any) => setFormData({...formData, tipoDaConsulta: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Consulta">Consulta</SelectItem>
-                    <SelectItem value="Avaliação">Avaliação</SelectItem>
-                    <SelectItem value="Retorno">Retorno</SelectItem>
-                    <SelectItem value="Grupo">Grupo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
                 <Label>Modalidade</Label>
                 <Select value={formData.modalidade} onValueChange={(value: any) => setFormData({...formData, modalidade: value})}>
                   <SelectTrigger>
@@ -1750,20 +1902,20 @@ export default function Agenda() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo de Atendimento</Label>
-              <Select value={formData.tipoAtendimento} onValueChange={(value: any) => setFormData({...formData, tipoAtendimento: value})}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Individual">Individual</SelectItem>
-                  <SelectItem value="Casal">Casal</SelectItem>
-                  <SelectItem value="Grupo">Grupo</SelectItem>
-                  <SelectItem value="Família">Família</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Label>Tipo de Atendimento</Label>
+                <Select value={formData.tipoAtendimento} onValueChange={(value: any) => setFormData({...formData, tipoAtendimento: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Individual">Individual</SelectItem>
+                    <SelectItem value="Casal">Casal</SelectItem>
+                    <SelectItem value="Grupo">Grupo</SelectItem>
+                    <SelectItem value="Família">Família</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
@@ -1779,22 +1931,7 @@ export default function Agenda() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Duração (minutos)</Label>
-              <Input
-                type="number"
-                value={formData.duracao}
-                onChange={(e) => setFormData({...formData, duracao: parseInt(e.target.value) || 50})}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Observações</Label>
-              <Textarea
-                placeholder="Observações sobre a consulta..."
-                value={formData.observacao}
-                onChange={(e) => setFormData({...formData, observacao: e.target.value})}
-              />
-            </div>
+
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
                 Cancelar

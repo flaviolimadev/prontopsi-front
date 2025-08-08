@@ -8,11 +8,13 @@ interface PublicRouteProps {
 }
 
 export function PublicRoute({ children }: PublicRouteProps) {
-  const { isAuthenticated, loading } = useAuth();
+  const { authState, loading } = useAuth();
   const location = useLocation();
 
-  // Mostrar loading enquanto verifica autenticação
-  if (loading) {
+  console.log('🔧 PublicRoute: Estado de auth:', authState);
+
+  // Mostrar loading enquanto inicializa
+  if (authState === 'INITIALIZING' || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="text-center">
@@ -23,12 +25,13 @@ export function PublicRoute({ children }: PublicRouteProps) {
     );
   }
 
-  // Se estiver autenticado, redirecionar para dashboard
-  if (isAuthenticated) {
+  // Se estiver autenticado e verificado, redirecionar para dashboard
+  if (authState === 'AUTHENTICATED') {
+    console.log('🔧 PublicRoute: Usuário autenticado, redirecionando para dashboard');
     const from = location.state?.from?.pathname || '/dashboard';
     return <Navigate to={from} replace />;
   }
 
-  // Se não estiver autenticado, mostrar o conteúdo público
+  // Se não estiver autenticado ou precisar de verificação, mostrar o conteúdo público
   return <>{children}</>;
 }

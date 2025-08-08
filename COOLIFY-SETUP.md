@@ -1,239 +1,84 @@
-# 🚀 Setup ProntuPsi Frontend no Coolify
+# 🌐 Coolify Setup - ProntuPsi Frontend
 
-Guia completo para deploy do frontend ProntuPsi no Coolify.
+## 📋 Configuração Completa no Coolify
 
-## 📋 Pré-requisitos
+### **1. Variáveis de Ambiente Obrigatórias**
 
-- ✅ Coolify instalado e configurado
-- ✅ Repositório Git com o código
-- ✅ Domínio configurado (opcional)
-
-## 🔧 Configuração no Coolify
-
-### 1. Criar Novo Projeto
-
-1. **Acesse o Coolify Dashboard**
-2. **Clique em "New Project"**
-3. **Conecte o Repositório Git**
-   - GitHub/GitLab/Bitbucket
-   - Selecione o repositório do ProntuPsi
-   - Branch: `main` ou `production`
-
-### 2. Configurar o Serviço
-
-#### Configurações Básicas:
-```
-Nome: prontupsi-frontend
-Tipo: Application
-Framework: Static (Nginx)
-```
-
-#### Build Settings:
-```
-Build Command: npm run build
-Output Directory: dist
-Install Command: npm ci
-Node Version: 18
-```
-
-#### Docker Settings (Alternativa):
-```
-Use o Dockerfile fornecido
-Context: ./frontEnd
-Dockerfile: ./frontEnd/Dockerfile
-```
-
-### 3. Variáveis de Ambiente
-
-Adicione as seguintes variáveis no Coolify:
+Configure estas variáveis no painel do Coolify:
 
 ```env
-# OBRIGATÓRIO: URL da API
+# URL da API Backend (OBRIGATÓRIO)
 VITE_API_URL=https://api.seudominio.com/api
 
-# Configurações da aplicação
+# Configurações da Aplicação
 VITE_APP_NAME=ProntuPsi
 VITE_NODE_ENV=production
 
-# Se usando backend também no Coolify
-VITE_API_URL=https://prontupsi-backend.seudominio.com/api
+# Configurações de Build
+NODE_ENV=production
 ```
 
-### 4. Configurar Domínio
+### **2. Configuração do Projeto**
 
-1. **Na aba "Domains"**
-2. **Adicionar domínio**: `prontupsi.seudominio.com`
-3. **Habilitar SSL**: Automático
-4. **Configurar DNS**: Aponte para o IP do Coolify
+#### **Build Settings:**
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+- **Dockerfile**: Use o Dockerfile fornecido
+- **Port**: `87`
 
-### 5. Deploy
+#### **Health Check:**
+- **URL**: `http://localhost:87/health`
+- **Interval**: 30s
+- **Timeout**: 10s
+- **Retries**: 3
 
-1. **Clique em "Deploy"**
-2. **Acompanhe os logs** em tempo real
-3. **Aguarde o build** finalizar (~2-5 minutos)
+### **3. Domínio e SSL**
 
-## 🔍 Logs e Monitoramento
+#### **Domínio Principal:**
+- **Domain**: `prontupsi.seudominio.com`
+- **SSL**: Automático (Let's Encrypt)
 
-### Verificar Logs de Build
+#### **Subdomínio da API (se necessário):**
+- **Domain**: `api.seudominio.com`
+- **SSL**: Automático
+
+### **4. Configuração do Backend**
+
+**IMPORTANTE**: O backend deve estar configurado antes do frontend!
+
+#### **Backend Settings:**
+- **Port**: `3000`
+- **Health Check**: `http://localhost:3000/api/health`
+- **Domain**: `api.seudominio.com`
+
+### **5. Ordem de Deploy**
+
+1. **Primeiro**: Deploy do Backend
+2. **Segundo**: Deploy do Frontend
+3. **Terceiro**: Configurar variáveis de ambiente
+
+### **6. Troubleshooting**
+
+#### **Erro 502 (Bad Gateway):**
+- ✅ Verificar se `VITE_API_URL` está configurada
+- ✅ Verificar se o backend está rodando
+- ✅ Verificar se o domínio da API está acessível
+
+#### **Verificar Configuração:**
 ```bash
-# No Coolify, acesse a aba "Logs"
-# Ou via CLI:
-coolify logs prontupsi-frontend
+# No console do navegador
+console.log(import.meta.env.VITE_API_URL)
+
+# Deve retornar: https://api.seudominio.com/api
 ```
 
-### Health Check
-```bash
-# Teste se a aplicação está rodando
-curl https://prontupsi.seudominio.com/health
-```
+### **7. URLs Finais**
 
-## 🛠️ Troubleshooting
-
-### ❌ Build Falha
-
-**Problema**: Build timeout ou erro de memória
-```
-Solução:
-1. Aumentar recursos no Coolify
-2. Verificar se todas as dependências estão no package.json
-3. Usar .dockerignore para otimizar
-```
-
-**Problema**: `VITE_API_URL` não funciona
-```
-Solução:
-1. Verificar se a variável está no ambiente de build
-2. Certificar que começa com VITE_
-3. Rebuild da aplicação
-```
-
-### ❌ Deploy Falha
-
-**Problema**: 404 em rotas do React Router
-```
-Solução:
-1. Verificar se nginx.conf está correto
-2. Confirmar fallback para index.html
-3. Usar Dockerfile fornecido
-```
-
-**Problema**: CORS errors
-```
-Solução:
-1. Configurar backend para aceitar origem do frontend
-2. Verificar VITE_API_URL
-3. Configurar proxy no nginx se necessário
-```
-
-### ❌ Performance Issues
-
-**Problema**: Carregamento lento
-```
-Solução:
-1. Verificar compressão Gzip (já configurado)
-2. Usar CDN se necessário
-3. Otimizar assets grandes
-```
-
-## 🔧 Configurações Avançadas
-
-### Custom Nginx Config
-
-Se precisar customizar o nginx, edite o arquivo `nginx.conf`:
-
-```nginx
-# Adicionar headers customizados
-add_header X-Custom-Header "ProntuPsi";
-
-# Configurar proxy para múltiplos backends
-location /api/v2/ {
-    proxy_pass http://backend-v2:3000/api/;
-}
-```
-
-### Multi-Environment Setup
-
-Para diferentes ambientes:
-
-1. **Staging**:
-   ```env
-   VITE_API_URL=https://api-staging.seudominio.com/api
-   VITE_NODE_ENV=staging
-   ```
-
-2. **Production**:
-   ```env
-   VITE_API_URL=https://api.seudominio.com/api
-   VITE_NODE_ENV=production
-   ```
-
-### Auto-Deploy via Webhook
-
-1. **Configure webhook** no repositório Git
-2. **URL**: `https://coolify.seudominio.com/webhooks/projeto-id`
-3. **Trigger**: Push to main branch
-
-## 📊 Monitoramento
-
-### Métricas Disponíveis
-
-- **CPU Usage**: Via dashboard do Coolify
-- **Memory Usage**: Limitado a 512MB por padrão
-- **Request Logs**: Nginx access logs
-- **Error Logs**: Nginx error logs
-
-### Alertas
-
-Configure alertas no Coolify para:
-- ❗ Alto uso de CPU/Memória
-- ❗ Falhas de health check
-- ❗ Erros de deploy
-
-## 🚀 Deploy Automatizado
-
-### GitHub Actions (Opcional)
-
-Crie `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy to Coolify
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Trigger Coolify Deploy
-        run: |
-          curl -X POST "${{ secrets.COOLIFY_WEBHOOK_URL }}"
-```
-
-## 📞 Suporte
-
-### Links Úteis
-- [Documentação Coolify](https://coolify.io/docs)
-- [Troubleshooting Guide](https://coolify.io/docs/troubleshooting)
-- [Community Discord](https://discord.gg/coolify)
-
-### Comandos Úteis
-
-```bash
-# Rebuild forçado
-coolify rebuild prontupsi-frontend
-
-# Restart serviço
-coolify restart prontupsi-frontend
-
-# Ver logs em tempo real
-coolify logs -f prontupsi-frontend
-
-# Status dos serviços
-coolify status
-```
+- **Frontend**: `https://prontupsi.seudominio.com`
+- **Backend API**: `https://api.seudominio.com/api`
+- **Health Check Frontend**: `https://prontupsi.seudominio.com/health`
+- **Health Check Backend**: `https://api.seudominio.com/api/health`
 
 ---
 
-**✨ Seu ProntuPsi estará online em poucos minutos! 🎉**
+**🎯 Resultado**: Frontend conectado ao backend via HTTPS!
