@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Loader2 } from 'lucide-react';
+import { Plus, Edit, Loader2, UserPlus, UserMinus } from 'lucide-react';
 import { Paciente } from '@/hooks/usePacientes';
 
 interface PacienteFormProps {
@@ -36,7 +36,14 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
     contato_emergencia: '',
     medicacoes: [],
     status: 0,
-    cor: '#3B82F6'
+    cor: '#3B82F6',
+    is_menor: false,
+    responsavel1_nome: '',
+    responsavel1_telefone: '',
+    responsavel1_parentesco: '',
+    responsavel2_nome: '',
+    responsavel2_telefone: '',
+    responsavel2_parentesco: ''
   });
 
   useEffect(() => {
@@ -54,20 +61,56 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
         contato_emergencia: paciente.contato_emergencia || '',
         medicacoes: paciente.medicacoes || [],
         status: paciente.status,
-        cor: paciente.cor || '#3B82F6'
+        cor: paciente.cor || '#3B82F6',
+        is_menor: paciente.is_menor || false,
+        responsavel1_nome: paciente.responsavel1_nome || '',
+        responsavel1_telefone: paciente.responsavel1_telefone || '',
+        responsavel1_parentesco: paciente.responsavel1_parentesco || '',
+        responsavel2_nome: paciente.responsavel2_nome || '',
+        responsavel2_telefone: paciente.responsavel2_telefone || '',
+        responsavel2_parentesco: paciente.responsavel2_parentesco || ''
       });
     }
   }, [paciente, mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validação para pacientes menores de idade
+    if (formData.is_menor) {
+      if (!formData.responsavel1_nome || !formData.responsavel1_telefone || !formData.responsavel1_parentesco) {
+        alert('Para pacientes menores de idade, é obrigatório informar os dados do responsável 1 (nome, telefone e parentesco).');
+        return;
+      }
+    }
+    
     try {
+      // Se for menor de idade, salvar responsáveis como contatos de emergência
+      let dataToSubmit = { ...formData };
+      
+      if (formData.is_menor) {
+        let emergencyContacts = [];
+        
+        if (formData.responsavel1_nome && formData.responsavel1_telefone) {
+          emergencyContacts.push(`${formData.responsavel1_nome} (${formData.responsavel1_parentesco}): ${formData.responsavel1_telefone}`);
+        }
+        
+        if (formData.responsavel2_nome && formData.responsavel2_telefone) {
+          emergencyContacts.push(`${formData.responsavel2_nome} (${formData.responsavel2_parentesco}): ${formData.responsavel2_telefone}`);
+        }
+        
+        // Se não há contato de emergência preenchido, usar os responsáveis
+        if (!formData.contato_emergencia && emergencyContacts.length > 0) {
+          dataToSubmit.contato_emergencia = emergencyContacts.join(' | ');
+        }
+      }
+      
       if (mode === 'edit' && paciente) {
         // Para edição, incluir o ID do paciente
-        await onSubmit({ ...formData, id: paciente.id });
+        await onSubmit({ ...dataToSubmit, id: paciente.id });
       } else {
         // Para criação, enviar apenas os dados
-        await onSubmit(formData);
+        await onSubmit(dataToSubmit);
       }
       setOpen(false);
       // Reset form
@@ -84,11 +127,32 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
         contato_emergencia: '',
         medicacoes: [],
         status: 0,
-        cor: '#3B82F6'
+        cor: '#3B82F6',
+        is_menor: false,
+        responsavel1_nome: '',
+        responsavel1_telefone: '',
+        responsavel1_parentesco: '',
+        responsavel2_nome: '',
+        responsavel2_telefone: '',
+        responsavel2_parentesco: ''
       });
     } catch (error) {
       console.error('Erro ao salvar paciente:', error);
     }
+  };
+
+  // Função para calcular se é menor de idade
+  const calculateIsMinor = (birthDate: string) => {
+    if (!birthDate) return false;
+    const today = new Date();
+    const birth = new Date(birthDate);
+    const age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      return age - 1 < 18;
+    }
+    return age < 18;
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -142,10 +206,35 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
       }
     }
     
-    setFormData(prev => ({
-      ...prev,
-      [field]: formattedValue
-    }));
+    // Formatação dos telefones dos responsáveis (mesma lógica do telefone)
+    if (field === 'responsavel1_telefone' || field === 'responsavel2_telefone') {
+      // Remove tudo que não é número
+      const numbers = value.replace(/\D/g, '');
+      // Aplica a máscara do telefone
+      if (numbers.length <= 2) {
+        formattedValue = `(${numbers}`;
+      } else if (numbers.length <= 6) {
+        formattedValue = `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+      } else if (numbers.length <= 10) {
+        formattedValue = `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+      } else {
+        formattedValue = `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+      }
+    }
+    
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [field]: formattedValue
+      };
+      
+      // Se a data de nascimento foi alterada, recalcular se é menor
+      if (field === 'nascimento') {
+        newData.is_menor = calculateIsMinor(formattedValue);
+      }
+      
+      return newData;
+    });
   };
 
   return (
@@ -259,6 +348,134 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
+
+                                  {/* Indicador de Menor de Idade */}
+                  {formData.nascimento && (
+                    <div className="md:col-span-2">
+                      <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        {formData.is_menor ? (
+                          <>
+                            <UserMinus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                            <span className="text-blue-800 dark:text-blue-200 font-medium">Paciente menor de idade</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="w-5 h-5 text-green-600 dark:text-green-400" />
+                            <span className="text-green-800 dark:text-green-200 font-medium">Paciente maior de idade</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Responsáveis (apenas se for menor de idade) */}
+                {formData.is_menor && (
+                  <>
+                                          {/* Responsável 1 */}
+                      <div className="md:col-span-2">
+                        <div className="p-4 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+                          <h4 className="font-medium text-orange-800 dark:text-orange-200 mb-3 flex items-center gap-2">
+                            <UserPlus className="w-4 h-4" />
+                            Responsável 1 *
+                          </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <Label htmlFor="responsavel1_nome">Nome Completo *</Label>
+                            <Input
+                              id="responsavel1_nome"
+                              value={formData.responsavel1_nome}
+                              onChange={(e) => handleInputChange('responsavel1_nome', e.target.value)}
+                              placeholder="Nome do responsável"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="responsavel1_telefone">Telefone *</Label>
+                            <Input
+                              id="responsavel1_telefone"
+                              value={formData.responsavel1_telefone}
+                              onChange={(e) => handleInputChange('responsavel1_telefone', e.target.value)}
+                              placeholder="(11) 99999-9999"
+                              maxLength={15}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="responsavel1_parentesco">Parentesco *</Label>
+                            <Select value={formData.responsavel1_parentesco} onValueChange={(value) => handleInputChange('responsavel1_parentesco', value)}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Pai">Pai</SelectItem>
+                                <SelectItem value="Mãe">Mãe</SelectItem>
+                                <SelectItem value="Avô">Avô</SelectItem>
+                                <SelectItem value="Avó">Avó</SelectItem>
+                                <SelectItem value="Tio">Tio</SelectItem>
+                                <SelectItem value="Tia">Tia</SelectItem>
+                                <SelectItem value="Irmão">Irmão</SelectItem>
+                                <SelectItem value="Irmã">Irmã</SelectItem>
+                                <SelectItem value="Tutor">Tutor</SelectItem>
+                                <SelectItem value="Outro">Outro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                                          {/* Responsável 2 (opcional) */}
+                      <div className="md:col-span-2">
+                        <div className="p-4 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                          <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                            <UserPlus className="w-4 h-4" />
+                            Responsável 2 (Opcional)
+                          </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <Label htmlFor="responsavel2_nome">Nome Completo</Label>
+                            <Input
+                              id="responsavel2_nome"
+                              value={formData.responsavel2_nome}
+                              onChange={(e) => handleInputChange('responsavel2_nome', e.target.value)}
+                              placeholder="Nome do segundo responsável"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="responsavel2_telefone">Telefone</Label>
+                            <Input
+                              id="responsavel2_telefone"
+                              value={formData.responsavel2_telefone}
+                              onChange={(e) => handleInputChange('responsavel2_telefone', e.target.value)}
+                              placeholder="(11) 99999-9999"
+                              maxLength={15}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="responsavel2_parentesco">Parentesco</Label>
+                            <Select value={formData.responsavel2_parentesco} onValueChange={(value) => handleInputChange('responsavel2_parentesco', value)}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Pai">Pai</SelectItem>
+                                <SelectItem value="Mãe">Mãe</SelectItem>
+                                <SelectItem value="Avô">Avô</SelectItem>
+                                <SelectItem value="Avó">Avó</SelectItem>
+                                <SelectItem value="Tio">Tio</SelectItem>
+                                <SelectItem value="Tia">Tia</SelectItem>
+                                <SelectItem value="Irmão">Irmão</SelectItem>
+                                <SelectItem value="Irmã">Irmã</SelectItem>
+                                <SelectItem value="Tutor">Tutor</SelectItem>
+                                <SelectItem value="Outro">Outro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* Status */}
                 <div>
@@ -374,6 +591,134 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
                      </SelectContent>
                    </Select>
                  </div>
+
+                 {/* Indicador de Menor de Idade */}
+                 {formData.nascimento && (
+                   <div className="md:col-span-2">
+                     <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                       {formData.is_menor ? (
+                         <>
+                           <UserMinus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                           <span className="text-blue-800 dark:text-blue-200 font-medium">Paciente menor de idade</span>
+                         </>
+                       ) : (
+                         <>
+                           <UserPlus className="w-5 h-5 text-green-600 dark:text-green-400" />
+                           <span className="text-green-800 dark:text-green-200 font-medium">Paciente maior de idade</span>
+                         </>
+                       )}
+                     </div>
+                   </div>
+                 )}
+
+                 {/* Responsáveis (apenas se for menor de idade) */}
+                 {formData.is_menor && (
+                   <>
+                     {/* Responsável 1 */}
+                     <div className="md:col-span-2">
+                       <div className="p-4 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+                         <h4 className="font-medium text-orange-800 dark:text-orange-200 mb-3 flex items-center gap-2">
+                           <UserPlus className="w-4 h-4" />
+                           Responsável 1 *
+                         </h4>
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                           <div>
+                             <Label htmlFor="responsavel1_nome">Nome Completo *</Label>
+                             <Input
+                               id="responsavel1_nome"
+                               value={formData.responsavel1_nome}
+                               onChange={(e) => handleInputChange('responsavel1_nome', e.target.value)}
+                               placeholder="Nome do responsável"
+                               required
+                             />
+                           </div>
+                           <div>
+                             <Label htmlFor="responsavel1_telefone">Telefone *</Label>
+                             <Input
+                               id="responsavel1_telefone"
+                               value={formData.responsavel1_telefone}
+                               onChange={(e) => handleInputChange('responsavel1_telefone', e.target.value)}
+                               placeholder="(11) 99999-9999"
+                               maxLength={15}
+                               required
+                             />
+                           </div>
+                           <div>
+                             <Label htmlFor="responsavel1_parentesco">Parentesco *</Label>
+                             <Select value={formData.responsavel1_parentesco} onValueChange={(value) => handleInputChange('responsavel1_parentesco', value)}>
+                               <SelectTrigger>
+                                 <SelectValue placeholder="Selecione" />
+                               </SelectTrigger>
+                               <SelectContent>
+                                 <SelectItem value="Pai">Pai</SelectItem>
+                                 <SelectItem value="Mãe">Mãe</SelectItem>
+                                 <SelectItem value="Avô">Avô</SelectItem>
+                                 <SelectItem value="Avó">Avó</SelectItem>
+                                 <SelectItem value="Tio">Tio</SelectItem>
+                                 <SelectItem value="Tia">Tia</SelectItem>
+                                 <SelectItem value="Irmão">Irmão</SelectItem>
+                                 <SelectItem value="Irmã">Irmã</SelectItem>
+                                 <SelectItem value="Tutor">Tutor</SelectItem>
+                                 <SelectItem value="Outro">Outro</SelectItem>
+                               </SelectContent>
+                             </Select>
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+
+                     {/* Responsável 2 (opcional) */}
+                     <div className="md:col-span-2">
+                       <div className="p-4 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                         <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                           <UserPlus className="w-4 h-4" />
+                           Responsável 2 (Opcional)
+                         </h4>
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                           <div>
+                             <Label htmlFor="responsavel2_nome">Nome Completo</Label>
+                             <Input
+                               id="responsavel2_nome"
+                               value={formData.responsavel2_nome}
+                               onChange={(e) => handleInputChange('responsavel2_nome', e.target.value)}
+                               placeholder="Nome do segundo responsável"
+                             />
+                           </div>
+                           <div>
+                             <Label htmlFor="responsavel2_telefone">Telefone</Label>
+                             <Input
+                               id="responsavel2_telefone"
+                               value={formData.responsavel2_telefone}
+                               onChange={(e) => handleInputChange('responsavel2_telefone', e.target.value)}
+                               placeholder="(11) 99999-9999"
+                               maxLength={15}
+                             />
+                           </div>
+                           <div>
+                             <Label htmlFor="responsavel2_parentesco">Parentesco</Label>
+                             <Select value={formData.responsavel2_parentesco} onValueChange={(value) => handleInputChange('responsavel2_parentesco', value)}>
+                               <SelectTrigger>
+                                 <SelectValue placeholder="Selecione" />
+                               </SelectTrigger>
+                               <SelectContent>
+                                 <SelectItem value="Pai">Pai</SelectItem>
+                                 <SelectItem value="Mãe">Mãe</SelectItem>
+                                 <SelectItem value="Avô">Avô</SelectItem>
+                                 <SelectItem value="Avó">Avó</SelectItem>
+                                 <SelectItem value="Tio">Tio</SelectItem>
+                                 <SelectItem value="Tia">Tia</SelectItem>
+                                 <SelectItem value="Irmão">Irmão</SelectItem>
+                                 <SelectItem value="Irmã">Irmã</SelectItem>
+                                 <SelectItem value="Tutor">Tutor</SelectItem>
+                                 <SelectItem value="Outro">Outro</SelectItem>
+                               </SelectContent>
+                             </Select>
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+                   </>
+                 )}
 
                  {/* Profissão */}
                  <div>

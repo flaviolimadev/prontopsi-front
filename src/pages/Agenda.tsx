@@ -10,12 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarDays, Clock, User, Plus, Edit, Trash2, RefreshCw, AlertCircle, Repeat, ChevronLeft, ChevronRight, ExternalLink, Calendar, MapPin, Clock as ClockIcon, Search, Filter, X, CreditCard, DollarSign, CheckCircle, CheckCircle2 } from "lucide-react";
+import { CalendarDays, Clock, User, Plus, Edit, Trash2, RefreshCw, AlertCircle, Repeat, ChevronLeft, ChevronRight, ExternalLink, Calendar, MapPin, Clock as ClockIcon, Search, Filter, X, CreditCard, DollarSign, CheckCircle, CheckCircle2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAgendaSessoes } from "@/hooks/useAgendaSessoes";
 import { usePacientes } from "@/hooks/usePacientes";
 import { usePacotes } from "../hooks/usePacotes";
 import { usePagamentos } from "@/hooks/usePagamentos";
+import { SessionRecordModal } from "@/components/pacientes/SessionRecordModal";
 import { AgendaSkeleton } from "@/components/ui/agenda-skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -98,6 +99,8 @@ export default function Agenda() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<any>(null);
   const [draggedAppointment, setDraggedAppointment] = useState<any>(null); // New
+  const [isSessionRecordModalOpen, setIsSessionRecordModalOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null); // New
   
   // Estados para modais de pagamento
@@ -531,7 +534,7 @@ export default function Agenda() {
       console.error('Erro ao criar sessão:', error);
       toast({
         title: "Erro",
-        description: "Erro ao agendar consulta. Tente novamente.",
+                        description: "Erro ao agendar sessão. Tente novamente.",
         variant: "destructive",
       });
     }
@@ -616,6 +619,29 @@ export default function Agenda() {
       value: appointment.value || 0
     });
     setIsEditModalOpen(true);
+  };
+
+  const handleEditSessionRecord = (session: any) => {
+    setSelectedSession(session);
+    setIsSessionRecordModalOpen(true);
+  };
+
+  const handleSaveSessionRecord = async (sessionId: string, observacao: string) => {
+    try {
+      await updateAgendaSessao(sessionId, { observacao });
+      toast({
+        title: "Sucesso",
+        description: "Registro da sessão atualizado com sucesso.",
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar registro da sessão:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar registro da sessão. Tente novamente.",
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
 
   const getStatusBadge = (status: number) => {
@@ -1005,14 +1031,14 @@ export default function Agenda() {
           <DialogTrigger asChild>
             <Button disabled={!!patientsError}>
               <Plus className="w-4 h-4 mr-2" />
-              Nova Consulta
+                              Nova Sessão
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Agendar Nova Consulta</DialogTitle>
+              <DialogTitle>Agendar Nova Sessão</DialogTitle>
               <DialogDescription>
-                Preencha os dados para agendar uma nova consulta
+                                  Preencha os dados para agendar uma nova sessão
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -1772,13 +1798,13 @@ export default function Agenda() {
                 <p className="text-sm text-muted-foreground mb-6">
                   {hasActiveFilters 
                     ? 'Tente ajustar os filtros de busca para encontrar mais resultados.'
-                    : 'Este dia está livre. Clique em "Nova Consulta" para agendar.'
+                    : 'Este dia está livre. Clique em "Nova Sessão" para agendar.'
                   }
                 </p>
                 {!hasActiveFilters && (
                   <Button onClick={() => setIsCreateModalOpen(true)}>
                     <Plus className="w-4 h-4 mr-2" />
-                    Agendar Consulta
+                    Agendar Sessão
                   </Button>
                 )}
               </div>
@@ -1904,6 +1930,15 @@ export default function Agenda() {
                           >
                             <Edit className="w-3 h-3" />
                             <span>Editar</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditSessionRecord(appointment)}
+                            className="flex items-center gap-2 flex-1 sm:flex-none"
+                          >
+                            <FileText className="w-3 h-3" />
+                            <span>Editar Registro</span>
                           </Button>
                         </div>
                         
@@ -2476,6 +2511,14 @@ export default function Agenda() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Session Record Modal */}
+      <SessionRecordModal
+        session={selectedSession}
+        open={isSessionRecordModalOpen}
+        onOpenChange={setIsSessionRecordModalOpen}
+        onSave={handleSaveSessionRecord}
+      />
     </div>
   );
 }

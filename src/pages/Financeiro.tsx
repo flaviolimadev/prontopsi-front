@@ -171,7 +171,6 @@ export default function Financeiro() {
   const [pacoteForm, setPacoteForm] = useState({
     title: '',
     value: '',
-    descricao: '',
     ativo: true
   });
 
@@ -426,12 +425,11 @@ export default function Financeiro() {
       await createPacote({
         title: pacoteForm.title,
         value: parseFloat(pacoteForm.value.replace(/[^\d,]/g, '').replace(',', '.')),
-        descricao: pacoteForm.descricao || undefined,
         ativo: pacoteForm.ativo
       });
       
       setIsPacoteModalOpen(false);
-      setPacoteForm({ title: '', value: '', descricao: '', ativo: true });
+      setPacoteForm({ title: '', value: '', ativo: true });
     } catch (error) {
       // Erro já tratado no hook
     }
@@ -442,7 +440,6 @@ export default function Financeiro() {
     setPacoteForm({
       title: pacote.title,
       value: pacote.value.toString(),
-      descricao: pacote.descricao || '',
       ativo: pacote.ativo
     });
     setIsEditPacoteModalOpen(true);
@@ -462,12 +459,11 @@ export default function Financeiro() {
       await updatePacote(selectedPacote.id, {
         title: pacoteForm.title,
         value: parseFloat(pacoteForm.value.replace(/[^\d,]/g, '').replace(',', '.')),
-        descricao: pacoteForm.descricao || undefined,
         ativo: pacoteForm.ativo
       });
       
       setIsEditPacoteModalOpen(false);
-      setPacoteForm({ title: '', value: '', descricao: '', ativo: true });
+      setPacoteForm({ title: '', value: '', ativo: true });
       setSelectedPacote(null);
     } catch (error) {
       // Erro já tratado no hook
@@ -1615,11 +1611,7 @@ export default function Financeiro() {
                       </Badge>
                     </div>
                     
-                    {pacote.descricao && (
-                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                        {pacote.descricao}
-                      </p>
-                    )}
+
                     
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>Criado em {new Date(pacote.createdAt).toLocaleDateString('pt-BR')}</span>
@@ -1698,15 +1690,7 @@ export default function Financeiro() {
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Descrição</Label>
-                    <Textarea
-                      placeholder="Descreva o que está incluído no pacote..."
-                      value={pacoteForm.descricao}
-                      onChange={(e) => setPacoteForm({...pacoteForm, descricao: e.target.value})}
-                      rows={3}
-                    />
-                  </div>
+
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
@@ -1757,15 +1741,7 @@ export default function Financeiro() {
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Textarea
-                placeholder="Descreva o que está incluído no pacote..."
-                value={pacoteForm.descricao}
-                onChange={(e) => setPacoteForm({...pacoteForm, descricao: e.target.value})}
-                rows={3}
-              />
-            </div>
+
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
