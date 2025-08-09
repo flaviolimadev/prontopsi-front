@@ -29,6 +29,9 @@ class ApiService {
         '/auth/register',
         '/auth/verify-email',
         '/auth/resend-verification',
+        '/auth/request-password-reset',
+        '/auth/verify-reset-code',
+        '/auth/reset-password',
         '/cadastro-links/public/',
         '/cadastro-links/public/submit'
       ];
@@ -574,6 +577,19 @@ class ApiService {
 
   async createPublicCadastroSubmission(data: any) {
     return this.post<any>('/cadastro-links/public/submit', data);
+  }
+
+  // Métodos de reset de senha
+  async requestPasswordReset(email: string) {
+    return this.post<any>('/auth/request-password-reset', { email });
+  }
+
+  async verifyResetCode(email: string, code: string) {
+    return this.post<any>('/auth/verify-reset-code', { email, code });
+  }
+
+  async resetPassword(email: string, code: string, newPassword: string) {
+    return this.post<any>('/auth/reset-password', { email, code, newPassword });
   }
 }
 

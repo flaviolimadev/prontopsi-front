@@ -5,7 +5,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Alert, AlertDescription } from "../components/ui/alert";
-import { Loader2, ArrowLeft, Sun, Moon } from "lucide-react";
+import { Loader2, ArrowLeft, Sun, Moon, Eye, EyeOff } from "lucide-react";
 import { useDarkMode } from "../components/theme/DarkModeProvider";
 import { useAuth } from "../components/auth/AuthProvider";
 
@@ -16,6 +16,7 @@ import logoColor from "@/assets/img/ProntuPsi - Principal.svg";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -153,15 +154,41 @@ export default function Login() {
 
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Sua senha"
-                  required
-                  disabled={loading}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Sua senha"
+                    required
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-500" />
+                    )}
+                  </Button>
+                </div>
+                <div className="text-right">
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto text-sm"
+                    onClick={() => navigate("/forgot-password")}
+                  >
+                    Esqueceu sua senha?
+                  </Button>
+                </div>
               </div>
 
               <Button

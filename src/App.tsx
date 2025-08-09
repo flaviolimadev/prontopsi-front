@@ -16,6 +16,8 @@ import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import EmailVerification from "./pages/EmailVerification";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import PublicCadastro from "./pages/PublicCadastro";
 import CadastroSucesso from "./pages/CadastroSucesso";
 
@@ -63,10 +65,18 @@ function App() {
                       </PublicRoute>
                     } 
                   />
-                  <Route
-                    path="/email-verification"
-                    element={<EmailVerification />}
-                  />
+                              <Route
+              path="/email-verification"
+              element={<EmailVerification />}
+            />
+            <Route
+              path="/forgot-password"
+              element={<ForgotPassword />}
+            />
+            <Route
+              path="/reset-password"
+              element={<ResetPassword />}
+            />
                   <Route
                     path="/cadastro/:token"
                     element={<PublicCadastro />}

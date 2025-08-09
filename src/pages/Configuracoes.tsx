@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { User, Bell, Calendar, DollarSign, Shield, Crown, CreditCard as CreditCardIcon, Key, Trash2, Download } from "lucide-react";
+import { User, Bell, Calendar, DollarSign, Shield, Crown, CreditCard as CreditCardIcon, Key, Trash2, Download, Eye, EyeOff } from "lucide-react";
 import { ProfileSection } from "@/components/profile/ProfileSection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,9 @@ export default function Configuracoes() {
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -336,33 +339,84 @@ export default function Configuracoes() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Senha Atual *</Label>
-                    <Input
-                      type="password"
-                      placeholder="Digite sua senha atual"
-                      value={passwordForm.currentPassword}
-                      onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
-                      disabled={isChangingPassword}
-                    />
+                    <div className="relative">
+                      <Input
+                        type={showCurrentPassword ? "text" : "password"}
+                        placeholder="Digite sua senha atual"
+                        value={passwordForm.currentPassword}
+                        onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                        disabled={isChangingPassword}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        disabled={isChangingPassword}
+                      >
+                        {showCurrentPassword ? (
+                          <EyeOff className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-500" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Nova Senha *</Label>
-                    <Input
-                      type="password"
-                      placeholder="Digite a nova senha"
-                      value={passwordForm.newPassword}
-                      onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
-                      disabled={isChangingPassword}
-                    />
+                    <div className="relative">
+                      <Input
+                        type={showNewPassword ? "text" : "password"}
+                        placeholder="Digite a nova senha"
+                        value={passwordForm.newPassword}
+                        onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                        disabled={isChangingPassword}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        disabled={isChangingPassword}
+                      >
+                        {showNewPassword ? (
+                          <EyeOff className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-500" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Confirmar Nova Senha *</Label>
-                    <Input
-                      type="password"
-                      placeholder="Confirme a nova senha"
-                      value={passwordForm.confirmPassword}
-                      onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
-                      disabled={isChangingPassword}
-                    />
+                    <div className="relative">
+                      <Input
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Confirme a nova senha"
+                        value={passwordForm.confirmPassword}
+                        onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                        disabled={isChangingPassword}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        disabled={isChangingPassword}
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-500" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => setIsPasswordModalOpen(false)} disabled={isChangingPassword}>
