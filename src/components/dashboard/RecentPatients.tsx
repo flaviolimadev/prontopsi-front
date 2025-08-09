@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { usePatients } from "@/hooks/usePatients";
 import { useAgendaSessoesReal } from "@/hooks/useAgendaSessoesReal";
+import { getAvatarUrl } from "@/utils/avatarUtils";
 
 
 interface PatientData {
@@ -23,6 +24,7 @@ interface PatientData {
   status: "ativo" | "inativo";
   sessionsCount: number;
   initials: string;
+  avatar?: string | null;
 }
 
 function PatientCard({ patient }: { patient: PatientData }) {
@@ -102,6 +104,11 @@ function PatientCard({ patient }: { patient: PatientData }) {
     <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors">
       <div className="flex items-center gap-3">
         <Avatar>
+          <AvatarImage 
+            src={getAvatarUrl(patient.avatar)} 
+            className="object-cover"
+            alt={`Avatar de ${patient.name}`}
+          />
           <AvatarFallback className="bg-primary text-primary-foreground font-medium">
             {patient.initials}
           </AvatarFallback>
@@ -242,7 +249,8 @@ export function RecentPatients() {
         nextSession: nextSession?.data,
         status: patient.status as "ativo" | "inativo",
         sessionsCount,
-        initials: patient.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        initials: patient.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+        avatar: patient.avatar || null
       };
     });
   }, [patients, agendaSessoes]);

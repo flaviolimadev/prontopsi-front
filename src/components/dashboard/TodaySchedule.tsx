@@ -14,8 +14,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAgendaSessoesReal } from "@/hooks/useAgendaSessoesReal";
 import { usePacientes } from "@/hooks/usePacientes";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getAvatarUrl } from "@/utils/avatarUtils";
 
-function AppointmentCard({ appointment, patientName }: { appointment: any; patientName: string }) {
+function AppointmentCard({ appointment, patientName, patientAvatar }: { appointment: any; patientName: string; patientAvatar?: string | null }) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "agendado":
@@ -54,9 +56,16 @@ function AppointmentCard({ appointment, patientName }: { appointment: any; patie
       isPast ? "bg-muted/30 border-muted" : "bg-card border-border hover:bg-muted/20 hover:border-primary/20"
     )}>
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-primary/10 border border-primary/20">
-          <User className="w-5 h-5 text-primary" />
-        </div>
+        <Avatar className="w-12 h-12 border border-primary/20">
+          <AvatarImage 
+            src={getAvatarUrl(patientAvatar)} 
+            className="object-cover"
+            alt={`Avatar de ${patientName}`}
+          />
+          <AvatarFallback className="bg-primary/10 text-primary">
+            <User className="w-5 h-5" />
+          </AvatarFallback>
+        </Avatar>
         
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
@@ -122,6 +131,7 @@ export function TodaySchedule() {
       return {
         ...sessao,
         patientName: paciente?.nome || 'Paciente não encontrado',
+        patientAvatar: paciente?.avatar || null,
         // Mapear status numérico para string para compatibilidade
         status: sessao.status === 0 ? "agendado" : 
                 sessao.status === 1 ? "em_andamento" :
@@ -217,6 +227,7 @@ export function TodaySchedule() {
                   key={appointment.id} 
                   appointment={appointment} 
                   patientName={appointment.patientName}
+                  patientAvatar={appointment.patientAvatar}
                 />
               ))}
             </div>
@@ -232,6 +243,7 @@ export function TodaySchedule() {
                   key={appointment.id} 
                   appointment={appointment} 
                   patientName={appointment.patientName}
+                  patientAvatar={appointment.patientAvatar}
                 />
               ))}
             </div>

@@ -1,13 +1,14 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Cake, Gift, Users } from "lucide-react";
 import { usePatients } from "@/hooks/usePatients";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
+import { getAvatarUrl } from "@/utils/avatarUtils";
 
 interface BirthdayPatient {
   id: string;
@@ -16,6 +17,7 @@ interface BirthdayPatient {
   daysUntil: number;
   age: number;
   isToday: boolean;
+  avatar?: string | null;
 }
 
 export function UpcomingBirthdays() {
@@ -46,7 +48,8 @@ export function UpcomingBirthdays() {
           birth_date: patient.birth_date!,
           daysUntil,
           age: thisYearBirthday.getFullYear() === currentYear ? age : age + 1,
-          isToday: daysUntil === 0
+          isToday: daysUntil === 0,
+          avatar: patient.avatar || null
         };
       })
       .sort((a, b) => a.daysUntil - b.daysUntil)
@@ -99,6 +102,11 @@ export function UpcomingBirthdays() {
                 onClick={() => navigate(`/pacientes/${patient.id}`)}
               >
                 <Avatar className="h-12 w-12 border border-border">
+                  <AvatarImage 
+                    src={getAvatarUrl(patient.avatar)} 
+                    className="object-cover"
+                    alt={`Avatar de ${patient.name}`}
+                  />
                   <AvatarFallback className={cn(
                     "font-semibold",
                     patient.isToday 

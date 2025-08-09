@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { FileText, Plus, Lock, Calendar, User, Search, Paperclip, Edit, Save, Download, Upload, Trash2, Clock } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getAvatarUrl } from "@/utils/avatarUtils";
 import { generateProntuarioPDF } from "@/components/prontuario/ProntuarioPDF";
 import { usePatients } from "@/hooks/usePatients";
 import { useAgendaSessoes } from "@/hooks/useAgendaSessoes";
@@ -316,9 +318,16 @@ export default function Prontuarios() {
             <Card key={patient.id} className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                    <User className="w-6 h-6 text-primary" />
-                  </div>
+                  <Avatar className="w-12 h-12">
+                    <AvatarImage 
+                      src={getAvatarUrl(patient.avatar)} 
+                      className="object-cover"
+                      alt={`Avatar de ${patient.name}`}
+                    />
+                    <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                      {patient.name?.charAt(0)?.toUpperCase() || 'P'}
+                    </AvatarFallback>
+                  </Avatar>
                   <div>
                     <h3 className="font-semibold text-lg">{patient.name}</h3>
                     <p className="text-sm text-gray-600">{patient.email || "Sem email"}</p>
@@ -385,9 +394,21 @@ export default function Prontuarios() {
           >
             ← Voltar ao Perfil
           </Button>
-          <div>
-                            <h1 className="text-3xl font-bold text-foreground">Prontuário Psicológico</h1>
-                <p className="text-muted-foreground mt-1">Paciente: {selectedPatient.name}</p>
+          <div className="flex items-center gap-4">
+            <Avatar className="w-12 h-12">
+              <AvatarImage 
+                src={getAvatarUrl(selectedPatient.avatar)} 
+                className="object-cover"
+                alt={`Avatar de ${selectedPatient.name}`}
+              />
+              <AvatarFallback className="text-lg font-bold">
+                {selectedPatient.name?.charAt(0)?.toUpperCase() || 'P'}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Prontuário Psicológico</h1>
+              <p className="text-muted-foreground mt-1">Paciente: {selectedPatient.name}</p>
+            </div>
           </div>
         </div>
         <div className="flex gap-2">

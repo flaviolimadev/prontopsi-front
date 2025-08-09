@@ -19,6 +19,7 @@ export interface Paciente {
   medicacoes: any[] | null;
   status: number;
   cor: string | null;
+  avatar: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { DollarSign, Plus, TrendingUp, Calendar, Download, User, CreditCard, CalendarIcon, Package, Edit, Trash2, Power, PowerOff, RefreshCw, ChevronDown, ChevronUp, Filter, X } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getAvatarUrl } from "@/utils/avatarUtils";
 import { format } from "date-fns";
 import { usePatients } from "@/hooks/usePatients";
 import { usePacotes } from "../hooks/usePacotes";
@@ -1955,9 +1957,20 @@ export default function Financeiro() {
                 {displayPagamentos.map((pagamento) => (
                   <TableRow key={pagamento.id}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        {pagamento.paciente?.nome || 'Paciente não encontrado'}
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage 
+                            src={getAvatarUrl(pagamento.paciente?.avatar)} 
+                            className="object-cover"
+                            alt={`Avatar de ${pagamento.paciente?.nome}`}
+                          />
+                          <AvatarFallback className="text-xs">
+                            {pagamento.paciente?.nome?.charAt(0)?.toUpperCase() || 'P'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">
+                          {pagamento.paciente?.nome || 'Paciente não encontrado'}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>

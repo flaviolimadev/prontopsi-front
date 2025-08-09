@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { usePatients } from "@/hooks/usePatients";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useToast } from "@/hooks/use-toast";
+import { getAvatarUrl } from "@/utils/avatarUtils";
 
 function ActivePatientCard({ patient }: { patient: any }) {
   const navigate = useNavigate();
@@ -46,6 +47,11 @@ function ActivePatientCard({ patient }: { patient: any }) {
          onClick={() => navigate(`/pacientes/${patient.id}`)}>
       <div className="flex items-center gap-3">
         <Avatar>
+          <AvatarImage 
+            src={getAvatarUrl(patient.avatar)} 
+            className="object-cover"
+            alt={`Avatar de ${patient.name}`}
+          />
           <AvatarFallback className="bg-primary/10 text-primary font-medium">
             {patient.name.split(' ').map(n => n[0]).join('').toUpperCase()}
           </AvatarFallback>

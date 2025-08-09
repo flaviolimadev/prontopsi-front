@@ -24,6 +24,8 @@ import {
   ChevronsRight,
   Palette
 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarUrl } from '@/utils/avatarUtils';
 import { Paciente } from '@/hooks/usePacientes';
 import { EditPacienteModal } from './EditPacienteModal';
 
@@ -220,22 +222,33 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
                   pacientes.map((paciente) => (
                     <TableRow key={paciente.id}>
                       <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleColorChange(paciente)}
-                            className="p-1 h-8 w-8 rounded-full border-2 border-gray-300 hover:border-gray-400 transition-colors"
-                            style={{ backgroundColor: paciente.cor || '#3B82F6' }}
-                            title={`Alterar cor do paciente ${paciente.nome}`}
-                          >
-                            <Palette className="w-3 h-3 text-white" />
-                          </Button>
-                          <div>
-                            <div className="font-medium">{paciente.nome}</div>
-                            {paciente.profissao && (
-                              <div className="text-sm text-gray-500">{paciente.profissao}</div>
-                            )}
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="w-10 h-10">
+                            <AvatarImage 
+                              src={getAvatarUrl(paciente.avatar)} 
+                              className="object-cover"
+                            />
+                            <AvatarFallback>
+                              {paciente.nome?.charAt(0)?.toUpperCase() || 'P'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleColorChange(paciente)}
+                              className="p-1 h-6 w-6 rounded-full border-2 border-gray-300 hover:border-gray-400 transition-colors"
+                              style={{ backgroundColor: paciente.cor || '#3B82F6' }}
+                              title={`Alterar cor do paciente ${paciente.nome}`}
+                            >
+                              <Palette className="w-2 h-2 text-white" />
+                            </Button>
+                            <div>
+                              <div className="font-medium">{paciente.nome}</div>
+                              {paciente.profissao && (
+                                <div className="text-sm text-gray-500">{paciente.profissao}</div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </TableCell>

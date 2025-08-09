@@ -24,6 +24,7 @@ export interface Patient {
   is_minor?: boolean;
   guardian_name?: string;
   guardian_phone?: string;
+  avatar?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +69,7 @@ const mockPatients: Patient[] = [
     gender: 'feminino',
     age_group: 'adulto',
     is_minor: false,
+    avatar: null,
     created_at: '2023-08-01T10:00:00Z',
     updated_at: '2024-01-15T14:30:00Z'
   },
@@ -90,6 +92,7 @@ const mockPatients: Patient[] = [
     gender: 'masculino',
     age_group: 'adulto',
     is_minor: false,
+    avatar: null,
     created_at: '2023-09-15T10:00:00Z',
     updated_at: '2024-01-10T16:00:00Z'
   },
@@ -114,6 +117,7 @@ const mockPatients: Patient[] = [
     is_minor: true,
     guardian_name: 'Carlos Costa',
     guardian_phone: '(11) 88888-3333',
+    avatar: null,
     created_at: '2023-10-01T10:00:00Z',
     updated_at: '2024-01-12T15:30:00Z'
   },
@@ -136,6 +140,7 @@ const mockPatients: Patient[] = [
     gender: 'masculino',
     age_group: 'adulto',
     is_minor: false,
+    avatar: null,
     created_at: '2023-11-01T10:00:00Z',
     updated_at: '2023-11-20T17:00:00Z'
   },
@@ -158,6 +163,7 @@ const mockPatients: Patient[] = [
     gender: 'feminino',
     age_group: 'adulto',
     is_minor: false,
+    avatar: null,
     created_at: '2023-07-15T10:00:00Z',
     updated_at: '2024-01-14T13:45:00Z'
   }
@@ -194,6 +200,7 @@ export function usePatients() {
     is_minor: false, // Calcular baseado na data de nascimento
     guardian_name: undefined,
     guardian_phone: undefined,
+    avatar: paciente.avatar || null,
     created_at: paciente.createdAt || new Date().toISOString(),
     updated_at: paciente.updatedAt || new Date().toISOString()
   });

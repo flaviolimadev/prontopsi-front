@@ -187,14 +187,40 @@ class ApiService {
       },
     };
 
-    console.log('ApiService: Enviando requisição para /users/me/avatar');
-    const result = await this.post<any>('/users/me/avatar', formData, config);
+    console.log('ApiService: Enviando requisição para /profile/avatar');
+    const result = await this.post<any>('/profile/avatar', formData, config);
     console.log('ApiService: Resultado do upload:', result);
     return result;
   }
 
   async deleteAvatar() {
-    return this.delete<any>('/users/me/avatar');
+    return this.delete<any>('/profile/avatar');
+  }
+
+  // Upload avatar do paciente
+  async uploadPacienteAvatar(pacienteId: string, file: File, onProgress?: (progress: number) => void) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const config: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: onProgress ? (progressEvent) => {
+        if (progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(progress);
+        }
+      } : undefined,
+    };
+
+    const result = await this.post<any>(`/pacientes/${pacienteId}/avatar`, formData, config);
+    return result;
+  }
+
+  // Deletar avatar do paciente
+  async deletePacienteAvatar(pacienteId: string) {
+    return this.delete<any>(`/pacientes/${pacienteId}/avatar`);
   }
 
   async exportUserData() {

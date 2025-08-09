@@ -5,8 +5,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Save, Loader2, MapPin } from 'lucide-react';
+import { Save, Loader2, MapPin, Palette, UserCircle, User, Building2, FileText } from 'lucide-react';
 import { useAddressSearch } from '@/hooks/useAddressSearch';
+import { PacienteAvatarUploadModal } from './PacienteAvatarUploadModal';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarUrl } from '@/utils/avatarUtils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface EditPacienteModalProps {
   paciente: any;
@@ -46,6 +50,7 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
     city: '',
     state: ''
   });
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
 
   // Carregar dados do paciente quando o modal abrir
   useEffect(() => {
@@ -156,6 +161,11 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
     }));
   };
 
+  const handleAvatarSuccess = (avatarUrl: string) => {
+    // O paciente será atualizado automaticamente através do hook
+    setShowAvatarModal(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={(open) => {
       onOpenChange(open);
@@ -172,225 +182,290 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Nome Completo *</Label>
-            <Input
-              placeholder="Nome completo"
-              value={editForm.name}
-              onChange={(e) => handleInputChange('name', e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                placeholder="email@exemplo.com"
-                value={editForm.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Telefone</Label>
-              <Input
-                placeholder="(11) 99999-9999"
-                value={editForm.phone}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-              />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Data de Nascimento</Label>
-              <Input
-                type="date"
-                value={editForm.birth_date}
-                onChange={(e) => handleInputChange('birth_date', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>CPF</Label>
-              <Input
-                placeholder="000.000.000-00"
-                value={editForm.cpf}
-                onChange={(e) => handleInputChange('cpf', e.target.value)}
-              />
-            </div>
-          </div>
+          <Tabs defaultValue="avatar" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="avatar" className="flex items-center gap-2">
+                <UserCircle className="w-4 h-4" />
+                Foto
+              </TabsTrigger>
+              <TabsTrigger value="personal" className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Dados Pessoais
+              </TabsTrigger>
+              <TabsTrigger value="address" className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Endereço
+              </TabsTrigger>
+              <TabsTrigger value="professional" className="flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                Profissional
+              </TabsTrigger>
+            </TabsList>
 
-          <div className="space-y-2">
-            <Label>Gênero</Label>
-            <Select
-              value={editForm.gender}
-              onValueChange={(value) => handleInputChange('gender', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o gênero" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Masculino">Masculino</SelectItem>
-                <SelectItem value="Feminino">Feminino</SelectItem>
-                <SelectItem value="Prefiro não informar">Prefiro não informar</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Buscar Endereço</Label>
-              <div className="flex gap-2">
-                <Select value={addressSearchType} onValueChange={(value: 'cep' | 'street') => setAddressSearchType(value)}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cep">Por CEP</SelectItem>
-                    <SelectItem value="street">Por Rua</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSearchAddress}
-                  disabled={addressLoading}
-                  className="flex-shrink-0"
-                >
-                  {addressLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <MapPin className="w-4 h-4" />
-                  )}
-                  Buscar
-                </Button>
+            {/* Tab - Foto do Paciente */}
+            <TabsContent value="avatar" className="space-y-6 mt-6">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Avatar className="w-16 h-16">
+                    <AvatarImage 
+                      src={getAvatarUrl(paciente?.avatar)} 
+                      className="object-cover"
+                    />
+                    <AvatarFallback>
+                      {paciente?.nome?.charAt(0)?.toUpperCase() || 'P'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <button
+                    type="button"
+                    onClick={() => setShowAvatarModal(true)}
+                    className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-colors"
+                    title="Redimensionar foto"
+                  >
+                    <Palette className="w-4 h-4" />
+                  </button>
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium">Foto do Paciente</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Clique no ícone da paleta para redimensionar a foto
+                  </p>
+                </div>
               </div>
-            </div>
+            </TabsContent>
 
-            {addressSearchType === 'cep' ? (
-              <div className="space-y-2">
-                <Label>CEP</Label>
-                <Input
-                  placeholder="00000-000"
-                  value={addressSearchData.cep}
-                  onChange={(e) => setAddressSearchData({ ...addressSearchData, cep: formatCEP(e.target.value) })}
-                  maxLength={9}
-                />
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2">
+            {/* Tab - Dados Pessoais */}
+            <TabsContent value="personal" className="space-y-6 mt-6">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Rua</Label>
+                  <Label>Nome Completo *</Label>
                   <Input
-                    placeholder="Nome da rua"
-                    value={addressSearchData.street}
-                    onChange={(e) => setAddressSearchData({ ...addressSearchData, street: e.target.value })}
+                    placeholder="Nome completo"
+                    value={editForm.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Cidade</Label>
-                  <Input
-                    placeholder="Nome da cidade"
-                    value={addressSearchData.city}
-                    onChange={(e) => setAddressSearchData({ ...addressSearchData, city: e.target.value })}
-                  />
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      placeholder="email@exemplo.com"
+                      value={editForm.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefone</Label>
+                    <Input
+                      placeholder="(11) 99999-9999"
+                      value={editForm.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                    />
+                  </div>
                 </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Data de Nascimento</Label>
+                    <Input
+                      type="date"
+                      value={editForm.birth_date}
+                      onChange={(e) => handleInputChange('birth_date', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CPF</Label>
+                    <Input
+                      placeholder="000.000.000-00"
+                      value={editForm.cpf}
+                      onChange={(e) => handleInputChange('cpf', e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>Estado</Label>
-                  <Select value={addressSearchData.state} onValueChange={(value) => setAddressSearchData({ ...addressSearchData, state: value })}>
+                  <Label>Gênero</Label>
+                  <Select
+                    value={editForm.gender}
+                    onValueChange={(value) => handleInputChange('gender', value)}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="UF" />
+                      <SelectValue placeholder="Selecione o gênero" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="AC">AC</SelectItem>
-                      <SelectItem value="AL">AL</SelectItem>
-                      <SelectItem value="AP">AP</SelectItem>
-                      <SelectItem value="AM">AM</SelectItem>
-                      <SelectItem value="BA">BA</SelectItem>
-                      <SelectItem value="CE">CE</SelectItem>
-                      <SelectItem value="DF">DF</SelectItem>
-                      <SelectItem value="ES">ES</SelectItem>
-                      <SelectItem value="GO">GO</SelectItem>
-                      <SelectItem value="MA">MA</SelectItem>
-                      <SelectItem value="MT">MT</SelectItem>
-                      <SelectItem value="MS">MS</SelectItem>
-                      <SelectItem value="MG">MG</SelectItem>
-                      <SelectItem value="PA">PA</SelectItem>
-                      <SelectItem value="PB">PB</SelectItem>
-                      <SelectItem value="PR">PR</SelectItem>
-                      <SelectItem value="PE">PE</SelectItem>
-                      <SelectItem value="PI">PI</SelectItem>
-                      <SelectItem value="RJ">RJ</SelectItem>
-                      <SelectItem value="RN">RN</SelectItem>
-                      <SelectItem value="RS">RS</SelectItem>
-                      <SelectItem value="RO">RO</SelectItem>
-                      <SelectItem value="RR">RR</SelectItem>
-                      <SelectItem value="SC">SC</SelectItem>
-                      <SelectItem value="SP">SP</SelectItem>
-                      <SelectItem value="SE">SE</SelectItem>
-                      <SelectItem value="TO">TO</SelectItem>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Feminino">Feminino</SelectItem>
+                      <SelectItem value="Prefiro não informar">Prefiro não informar</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-            )}
+            </TabsContent>
 
-            <div className="space-y-2">
-              <Label>Endereço Completo</Label>
-              <Textarea
-                placeholder="Endereço completo (será preenchido automaticamente ou pode ser editado manualmente)"
-                value={editForm.address}
-                onChange={(e) => handleInputChange('address', e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
+            {/* Tab - Endereço */}
+            <TabsContent value="address" className="space-y-6 mt-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Buscar Endereço</Label>
+                  <div className="flex gap-2">
+                    <Select value={addressSearchType} onValueChange={(value: 'cep' | 'street') => setAddressSearchType(value)}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cep">Por CEP</SelectItem>
+                        <SelectItem value="street">Por Rua</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSearchAddress}
+                      disabled={addressLoading}
+                      className="flex-shrink-0"
+                    >
+                      {addressLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <MapPin className="w-4 h-4" />
+                      )}
+                      Buscar
+                    </Button>
+                  </div>
+                </div>
 
-          <div className="space-y-2">
-            <Label>Profissão</Label>
-            <Input
-              placeholder="Profissão"
-              value={editForm.profession}
-              onChange={(e) => handleInputChange('profession', e.target.value)}
-            />
-          </div>
+                {addressSearchType === 'cep' ? (
+                  <div className="space-y-2">
+                    <Label>CEP</Label>
+                    <Input
+                      placeholder="00000-000"
+                      value={addressSearchData.cep}
+                      onChange={(e) => setAddressSearchData({ ...addressSearchData, cep: formatCEP(e.target.value) })}
+                      maxLength={9}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-2">
+                      <Label>Rua</Label>
+                      <Input
+                        placeholder="Nome da rua"
+                        value={addressSearchData.street}
+                        onChange={(e) => setAddressSearchData({ ...addressSearchData, street: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Cidade</Label>
+                      <Input
+                        placeholder="Nome da cidade"
+                        value={addressSearchData.city}
+                        onChange={(e) => setAddressSearchData({ ...addressSearchData, city: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Estado</Label>
+                      <Select value={addressSearchData.state} onValueChange={(value) => setAddressSearchData({ ...addressSearchData, state: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="UF" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AC">AC</SelectItem>
+                          <SelectItem value="AL">AL</SelectItem>
+                          <SelectItem value="AP">AP</SelectItem>
+                          <SelectItem value="AM">AM</SelectItem>
+                          <SelectItem value="BA">BA</SelectItem>
+                          <SelectItem value="CE">CE</SelectItem>
+                          <SelectItem value="DF">DF</SelectItem>
+                          <SelectItem value="ES">ES</SelectItem>
+                          <SelectItem value="GO">GO</SelectItem>
+                          <SelectItem value="MA">MA</SelectItem>
+                          <SelectItem value="MT">MT</SelectItem>
+                          <SelectItem value="MS">MS</SelectItem>
+                          <SelectItem value="MG">MG</SelectItem>
+                          <SelectItem value="PA">PA</SelectItem>
+                          <SelectItem value="PB">PB</SelectItem>
+                          <SelectItem value="PR">PR</SelectItem>
+                          <SelectItem value="PE">PE</SelectItem>
+                          <SelectItem value="PI">PI</SelectItem>
+                          <SelectItem value="RJ">RJ</SelectItem>
+                          <SelectItem value="RN">RN</SelectItem>
+                          <SelectItem value="RS">RS</SelectItem>
+                          <SelectItem value="RO">RO</SelectItem>
+                          <SelectItem value="RR">RR</SelectItem>
+                          <SelectItem value="SC">SC</SelectItem>
+                          <SelectItem value="SP">SP</SelectItem>
+                          <SelectItem value="SE">SE</SelectItem>
+                          <SelectItem value="TO">TO</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
 
-          <div className="space-y-2">
-            <Label>Contato de Emergência</Label>
-            <Input
-              placeholder="Nome e telefone do contato de emergência"
-              value={editForm.emergency_contact}
-              onChange={(e) => handleInputChange('emergency_contact', e.target.value)}
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label>Endereço Completo</Label>
+                  <Textarea
+                    placeholder="Endereço completo (será preenchido automaticamente ou pode ser editado manualmente)"
+                    value={editForm.address}
+                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </TabsContent>
 
-          <div className="space-y-2">
-            <Label>Observações Gerais</Label>
-            <Textarea
-              placeholder="Observações sobre o paciente"
-              value={editForm.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
-              rows={3}
-            />
-          </div>
+            {/* Tab - Informações Profissionais */}
+            <TabsContent value="professional" className="space-y-6 mt-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Profissão</Label>
+                  <Input
+                    placeholder="Profissão"
+                    value={editForm.profession}
+                    onChange={(e) => handleInputChange('profession', e.target.value)}
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <Select
-              value={editForm.status}
-              onValueChange={(value) => handleInputChange('status', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ativo">Ativo</SelectItem>
-                <SelectItem value="inativo">Inativo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+                <div className="space-y-2">
+                  <Label>Contato de Emergência</Label>
+                  <Input
+                    placeholder="Nome e telefone do contato de emergência"
+                    value={editForm.emergency_contact}
+                    onChange={(e) => handleInputChange('emergency_contact', e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Observações Gerais</Label>
+                  <Textarea
+                    placeholder="Observações sobre o paciente"
+                    value={editForm.notes}
+                    onChange={(e) => handleInputChange('notes', e.target.value)}
+                    rows={4}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select
+                    value={editForm.status}
+                    onValueChange={(value) => handleInputChange('status', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="inativo">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button
@@ -417,6 +492,16 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
           </div>
         </form>
       </DialogContent>
+
+      {/* Modal de Upload de Avatar */}
+      <PacienteAvatarUploadModal
+        isOpen={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        onSuccess={handleAvatarSuccess}
+        pacienteId={paciente?.id}
+        pacienteNome={paciente?.nome}
+        currentAvatar={paciente?.avatar}
+      />
     </Dialog>
   );
 };

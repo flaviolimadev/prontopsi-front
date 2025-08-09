@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarDays, Clock, User, Plus, Edit, Trash2, RefreshCw, AlertCircle, Repeat, ChevronLeft, ChevronRight, ExternalLink, Calendar, MapPin, Clock as ClockIcon, Search, Filter, X, CreditCard, DollarSign, CheckCircle, CheckCircle2, FileText } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getAvatarUrl } from "@/utils/avatarUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useAgendaSessoes } from "@/hooks/useAgendaSessoes";
 import { usePacientes } from "@/hooks/usePacientes";
@@ -224,6 +226,7 @@ export default function Agenda() {
           ...sessao,
           patientName: paciente?.nome || sessao.paciente?.nome || 'Paciente não encontrado',
           patientColor: paciente?.cor || null,
+          patientAvatar: paciente?.avatar || null,
           time: sessao.horario,
           date: sessao.data,
           patient_id: sessao.pacienteId,
@@ -1832,9 +1835,16 @@ export default function Agenda() {
                       <div className="flex items-start gap-3">
                         {/* Avatar do paciente */}
                         <div className="relative flex-shrink-0">
-                          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border-2 border-primary/20">
-                            <User className="w-5 h-5 sm:w-7 sm:h-7 text-primary" />
-                          </div>
+                          <Avatar className="w-12 h-12 sm:w-16 sm:h-16 border-2 border-primary/20">
+                            <AvatarImage 
+                              src={getAvatarUrl(appointment.patientAvatar)} 
+                              className="object-cover"
+                              alt={`Avatar de ${appointment.patientName}`}
+                            />
+                            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
+                              <User className="w-5 h-5 sm:w-7 sm:h-7" />
+                            </AvatarFallback>
+                          </Avatar>
                           {/* Indicador de modalidade */}
                           <div className="absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-background border-2 border-primary/20 flex items-center justify-center">
                             <span className="text-xs">{getModalityIcon(appointment.modalidade)}</span>
