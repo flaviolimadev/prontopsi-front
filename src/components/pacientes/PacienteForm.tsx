@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Edit, Loader2, UserPlus, UserMinus } from 'lucide-react';
@@ -27,6 +28,7 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
     nome: '',
     email: '',
     endereco: '',
+    cep: '',
     telefone: '',
     profissao: '',
     nascimento: '',
@@ -35,7 +37,7 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
     observacao_geral: '',
     contato_emergencia: '',
     medicacoes: [],
-    status: 0,
+    status: 1,
     cor: '#3B82F6',
     is_menor: false,
     responsavel1_nome: '',
@@ -52,6 +54,7 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
         nome: paciente.nome || '',
         email: paciente.email || '',
         endereco: paciente.endereco || '',
+        cep: paciente.cep || '',
         telefone: paciente.telefone || '',
         profissao: paciente.profissao || '',
         nascimento: paciente.nascimento || '',
@@ -118,6 +121,7 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
         nome: '',
         email: '',
         endereco: '',
+        cep: '',
         telefone: '',
         profissao: '',
         nascimento: '',
@@ -126,7 +130,7 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
         observacao_geral: '',
         contato_emergencia: '',
         medicacoes: [],
-        status: 0,
+        status: 1,
         cor: '#3B82F6',
         is_menor: false,
         responsavel1_nome: '',
@@ -153,6 +157,30 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
       return age - 1 < 18;
     }
     return age < 18;
+  };
+
+  // Função para buscar CEP
+  const handleCepSearch = async () => {
+    if (!formData.cep || formData.cep.length < 8) return;
+    
+    try {
+      const cleanCep = formData.cep.replace(/\D/g, '');
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+      
+      if (!data.erro) {
+        const endereco = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}, ${data.cep}`;
+        setFormData(prev => ({
+          ...prev,
+          endereco: endereco
+        }));
+      } else {
+        alert('CEP não encontrado. Verifique e tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      alert('Erro ao buscar CEP. Tente novamente.');
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -222,6 +250,18 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
       }
     }
     
+    // Formatação do CEP
+    if (field === 'cep') {
+      // Remove tudo que não é número
+      const numbers = value.replace(/\D/g, '');
+      // Aplica a máscara do CEP
+      if (numbers.length <= 5) {
+        formattedValue = numbers;
+      } else {
+        formattedValue = `${numbers.slice(0, 5)}-${numbers.slice(5, 8)}`;
+      }
+    }
+    
     setFormData(prev => {
       const newData = {
         ...prev,
@@ -269,251 +309,216 @@ export const PacienteForm: React.FC<PacienteFormProps> = ({
 
                  <form onSubmit={handleSubmit} className="space-y-4">
            {mode === 'create' ? (
-             // Formulário simplificado para criação
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               {/* Nome */}
-               <div className="md:col-span-2">
-                 <Label htmlFor="nome">Nome Completo *</Label>
-                 <Input
-                   id="nome"
-                   value={formData.nome}
-                   onChange={(e) => handleInputChange('nome', e.target.value)}
-                   placeholder="Nome completo do paciente"
-                   required
-                 />
-               </div>
+             <Tabs defaultValue="personal" className="w-full">
+               <TabsList className="grid w-full grid-cols-3">
+                 <TabsTrigger value="personal">Dados Pessoais</TabsTrigger>
+                 <TabsTrigger value="address">Endereço</TabsTrigger>
+                 <TabsTrigger value="professional">Profissional</TabsTrigger>
+               </TabsList>
+               <TabsContent value="personal" className="mt-4">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="md:col-span-2">
+                     <Label htmlFor="nome">Nome Completo *</Label>
+                     <Input id="nome" value={formData.nome} onChange={(e) => handleInputChange('nome', e.target.value)} placeholder="Nome completo do paciente" required />
+                   </div>
+                   <div>
+                     <Label htmlFor="email">Email</Label>
+                     <Input id="email" type="email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} placeholder="email@exemplo.com" />
+                   </div>
+                   <div>
+                     <Label htmlFor="telefone">Telefone</Label>
+                     <Input id="telefone" value={formData.telefone} onChange={(e) => handleInputChange('telefone', e.target.value)} placeholder="(11) 99999-9999" maxLength={15} />
+                   </div>
+                   <div>
+                     <Label htmlFor="cpf">CPF</Label>
+                     <Input id="cpf" value={formData.cpf} onChange={(e) => handleInputChange('cpf', e.target.value)} placeholder="000.000.000-00" maxLength={14} />
+                   </div>
+                   <div>
+                     <Label htmlFor="nascimento">Data de Nascimento</Label>
+                     <Input id="nascimento" type="date" value={formData.nascimento} onChange={(e) => handleInputChange('nascimento', e.target.value)} />
+                   </div>
+                   <div>
+                     <Label htmlFor="genero">Gênero</Label>
+                     <Select value={formData.genero} onValueChange={(value) => handleInputChange('genero', value)}>
+                       <SelectTrigger>
+                         <SelectValue placeholder="Selecione o gênero" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="Masculino">Masculino</SelectItem>
+                         <SelectItem value="Feminino">Feminino</SelectItem>
+                         <SelectItem value="Prefiro não informar">Prefiro não informar</SelectItem>
+                       </SelectContent>
+                     </Select>
+                   </div>
+                   {formData.nascimento && (
+                     <div className="md:col-span-2">
+                       <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                         {formData.is_menor ? (
+                           <>
+                             <UserMinus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                             <span className="text-blue-800 dark:text-blue-200 font-medium">Paciente menor de idade</span>
+                           </>
+                         ) : (
+                           <>
+                             <UserPlus className="w-5 h-5 text-green-600 dark:text-green-400" />
+                             <span className="text-green-800 dark:text-green-200 font-medium">Paciente maior de idade</span>
+                           </>
+                         )}
+                       </div>
+                     </div>
+                   )}
 
-               {/* Email */}
-               <div>
-                 <Label htmlFor="email">Email *</Label>
-                 <Input
-                   id="email"
-                   type="email"
-                   value={formData.email}
-                   onChange={(e) => handleInputChange('email', e.target.value)}
-                   placeholder="email@exemplo.com"
-                   required
-                 />
-               </div>
-
-                               {/* Telefone */}
-                <div>
-                  <Label htmlFor="telefone">Telefone *</Label>
-                  <Input
-                    id="telefone"
-                    value={formData.telefone}
-                    onChange={(e) => handleInputChange('telefone', e.target.value)}
-                    placeholder="(11) 99999-9999"
-                    maxLength={15}
-                    required
-                  />
-                </div>
-
-                {/* CPF */}
-                <div>
-                  <Label htmlFor="cpf">CPF *</Label>
-                  <Input
-                    id="cpf"
-                    value={formData.cpf}
-                    onChange={(e) => handleInputChange('cpf', e.target.value)}
-                    placeholder="000.000.000-00"
-                    maxLength={14}
-                    required
-                  />
-                </div>
-
-                               {/* Data de Nascimento */}
-                <div>
-                  <Label htmlFor="nascimento">Data de Nascimento *</Label>
-                  <Input
-                    id="nascimento"
-                    type="date"
-                    value={formData.nascimento}
-                    onChange={(e) => handleInputChange('nascimento', e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* Gênero */}
-                <div>
-                  <Label htmlFor="genero">Gênero *</Label>
-                  <Select value={formData.genero} onValueChange={(value) => handleInputChange('genero', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o gênero" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Masculino">Masculino</SelectItem>
-                      <SelectItem value="Feminino">Feminino</SelectItem>
-                      <SelectItem value="Prefiro não informar">Prefiro não informar</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                                  {/* Indicador de Menor de Idade */}
-                  {formData.nascimento && (
-                    <div className="md:col-span-2">
-                      <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        {formData.is_menor ? (
-                          <>
-                            <UserMinus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                            <span className="text-blue-800 dark:text-blue-200 font-medium">Paciente menor de idade</span>
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="w-5 h-5 text-green-600 dark:text-green-400" />
-                            <span className="text-green-800 dark:text-green-200 font-medium">Paciente maior de idade</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                {/* Responsáveis (apenas se for menor de idade) */}
-                {formData.is_menor && (
-                  <>
-                                          {/* Responsável 1 */}
-                      <div className="md:col-span-2">
-                        <div className="p-4 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
-                          <h4 className="font-medium text-orange-800 dark:text-orange-200 mb-3 flex items-center gap-2">
-                            <UserPlus className="w-4 h-4" />
-                            Responsável 1 *
-                          </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div>
-                            <Label htmlFor="responsavel1_nome">Nome Completo *</Label>
-                            <Input
-                              id="responsavel1_nome"
-                              value={formData.responsavel1_nome}
-                              onChange={(e) => handleInputChange('responsavel1_nome', e.target.value)}
-                              placeholder="Nome do responsável"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="responsavel1_telefone">Telefone *</Label>
-                            <Input
-                              id="responsavel1_telefone"
-                              value={formData.responsavel1_telefone}
-                              onChange={(e) => handleInputChange('responsavel1_telefone', e.target.value)}
-                              placeholder="(11) 99999-9999"
-                              maxLength={15}
-                              required
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="responsavel1_parentesco">Parentesco *</Label>
-                            <Select value={formData.responsavel1_parentesco} onValueChange={(value) => handleInputChange('responsavel1_parentesco', value)}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Pai">Pai</SelectItem>
-                                <SelectItem value="Mãe">Mãe</SelectItem>
-                                <SelectItem value="Avô">Avô</SelectItem>
-                                <SelectItem value="Avó">Avó</SelectItem>
-                                <SelectItem value="Tio">Tio</SelectItem>
-                                <SelectItem value="Tia">Tia</SelectItem>
-                                <SelectItem value="Irmão">Irmão</SelectItem>
-                                <SelectItem value="Irmã">Irmã</SelectItem>
-                                <SelectItem value="Tutor">Tutor</SelectItem>
-                                <SelectItem value="Outro">Outro</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                                          {/* Responsável 2 (opcional) */}
-                      <div className="md:col-span-2">
-                        <div className="p-4 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                          <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                            <UserPlus className="w-4 h-4" />
-                            Responsável 2 (Opcional)
-                          </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div>
-                            <Label htmlFor="responsavel2_nome">Nome Completo</Label>
-                            <Input
-                              id="responsavel2_nome"
-                              value={formData.responsavel2_nome}
-                              onChange={(e) => handleInputChange('responsavel2_nome', e.target.value)}
-                              placeholder="Nome do segundo responsável"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="responsavel2_telefone">Telefone</Label>
-                            <Input
-                              id="responsavel2_telefone"
-                              value={formData.responsavel2_telefone}
-                              onChange={(e) => handleInputChange('responsavel2_telefone', e.target.value)}
-                              placeholder="(11) 99999-9999"
-                              maxLength={15}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="responsavel2_parentesco">Parentesco</Label>
-                            <Select value={formData.responsavel2_parentesco} onValueChange={(value) => handleInputChange('responsavel2_parentesco', value)}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Pai">Pai</SelectItem>
-                                <SelectItem value="Mãe">Mãe</SelectItem>
-                                <SelectItem value="Avô">Avô</SelectItem>
-                                <SelectItem value="Avó">Avó</SelectItem>
-                                <SelectItem value="Tio">Tio</SelectItem>
-                                <SelectItem value="Tia">Tia</SelectItem>
-                                <SelectItem value="Irmão">Irmão</SelectItem>
-                                <SelectItem value="Irmã">Irmã</SelectItem>
-                                <SelectItem value="Tutor">Tutor</SelectItem>
-                                <SelectItem value="Outro">Outro</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Status */}
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status.toString()} onValueChange={(value) => handleInputChange('status', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">Inativo</SelectItem>
-                      <SelectItem value="1">Ativo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Cor */}
-                <div>
-                  <Label htmlFor="cor">Cor de Identificação</Label>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      id="cor"
-                      type="color"
-                      value={formData.cor}
-                      onChange={(e) => handleInputChange('cor', e.target.value)}
-                      className="w-16 h-10 p-1 border rounded"
-                    />
-                    <Input
-                      value={formData.cor}
-                      onChange={(e) => handleInputChange('cor', e.target.value)}
-                      placeholder="#3B82F6"
-                      className="flex-1"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Escolha uma cor para identificar o paciente na agenda
-                  </p>
-                </div>
-             </div>
+                   {formData.is_menor && (
+                     <>
+                       <div className="md:col-span-2">
+                         <div className="p-4 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+                           <h4 className="font-medium text-orange-800 dark:text-orange-200 mb-3 flex items-center gap-2">
+                             <UserPlus className="w-4 h-4" />
+                             Responsável 1 *
+                           </h4>
+                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                             <div>
+                               <Label htmlFor="responsavel1_nome">Nome Completo *</Label>
+                               <Input id="responsavel1_nome" value={formData.responsavel1_nome} onChange={(e) => handleInputChange('responsavel1_nome', e.target.value)} placeholder="Nome do responsável" required />
+                             </div>
+                             <div>
+                               <Label htmlFor="responsavel1_telefone">Telefone *</Label>
+                               <Input id="responsavel1_telefone" value={formData.responsavel1_telefone} onChange={(e) => handleInputChange('responsavel1_telefone', e.target.value)} placeholder="(11) 99999-9999" maxLength={15} required />
+                             </div>
+                             <div>
+                               <Label htmlFor="responsavel1_parentesco">Parentesco *</Label>
+                               <Select value={formData.responsavel1_parentesco} onValueChange={(value) => handleInputChange('responsavel1_parentesco', value)}>
+                                 <SelectTrigger>
+                                   <SelectValue placeholder="Selecione" />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                   <SelectItem value="Pai">Pai</SelectItem>
+                                   <SelectItem value="Mãe">Mãe</SelectItem>
+                                   <SelectItem value="Avô">Avô</SelectItem>
+                                   <SelectItem value="Avó">Avó</SelectItem>
+                                   <SelectItem value="Tio">Tio</SelectItem>
+                                   <SelectItem value="Tia">Tia</SelectItem>
+                                   <SelectItem value="Irmão">Irmão</SelectItem>
+                                   <SelectItem value="Irmã">Irmã</SelectItem>
+                                   <SelectItem value="Tutor">Tutor</SelectItem>
+                                   <SelectItem value="Outro">Outro</SelectItem>
+                                 </SelectContent>
+                               </Select>
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+                       <div className="md:col-span-2">
+                         <div className="p-4 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                           <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                             <UserPlus className="w-4 h-4" />
+                             Responsável 2 (Opcional)
+                           </h4>
+                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                             <div>
+                               <Label htmlFor="responsavel2_nome">Nome Completo</Label>
+                               <Input id="responsavel2_nome" value={formData.responsavel2_nome} onChange={(e) => handleInputChange('responsavel2_nome', e.target.value)} placeholder="Nome do segundo responsável" />
+                             </div>
+                             <div>
+                               <Label htmlFor="responsavel2_telefone">Telefone</Label>
+                               <Input id="responsavel2_telefone" value={formData.responsavel2_telefone} onChange={(e) => handleInputChange('responsavel2_telefone', e.target.value)} placeholder="(11) 99999-9999" maxLength={15} />
+                             </div>
+                             <div>
+                               <Label htmlFor="responsavel2_parentesco">Parentesco</Label>
+                               <Select value={formData.responsavel2_parentesco} onValueChange={(value) => handleInputChange('responsavel2_parentesco', value)}>
+                                 <SelectTrigger>
+                                   <SelectValue placeholder="Selecione" />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                   <SelectItem value="Pai">Pai</SelectItem>
+                                   <SelectItem value="Mãe">Mãe</SelectItem>
+                                   <SelectItem value="Avô">Avô</SelectItem>
+                                   <SelectItem value="Avó">Avó</SelectItem>
+                                   <SelectItem value="Tio">Tio</SelectItem>
+                                   <SelectItem value="Tia">Tia</SelectItem>
+                                   <SelectItem value="Irmão">Irmão</SelectItem>
+                                   <SelectItem value="Irmã">Irmã</SelectItem>
+                                   <SelectItem value="Tutor">Tutor</SelectItem>
+                                   <SelectItem value="Outro">Outro</SelectItem>
+                                 </SelectContent>
+                               </Select>
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+                     </>
+                   )}
+                 </div>
+               </TabsContent>
+               <TabsContent value="address" className="mt-4">
+                 <div className="space-y-4">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                       <Label htmlFor="cep">CEP</Label>
+                       <Input 
+                         id="cep" 
+                         value={formData.cep || ''} 
+                         onChange={(e) => handleInputChange('cep', e.target.value)} 
+                         placeholder="00000-000" 
+                         maxLength={9}
+                       />
+                       <Button 
+                         type="button" 
+                         variant="outline" 
+                         size="sm" 
+                         className="mt-2 w-full"
+                         onClick={handleCepSearch}
+                         disabled={!formData.cep || formData.cep.length < 8}
+                       >
+                         Buscar CEP
+                       </Button>
+                     </div>
+                     <div>
+                       <Label htmlFor="endereco">Endereço</Label>
+                       <Textarea 
+                         id="endereco" 
+                         value={formData.endereco} 
+                         onChange={(e) => handleInputChange('endereco', e.target.value)} 
+                         placeholder="Endereço completo" 
+                         rows={2} 
+                       />
+                     </div>
+                   </div>
+                 </div>
+               </TabsContent>
+               <TabsContent value="professional" className="mt-4">
+                 <div className="space-y-4">
+                   <div>
+                     <Label htmlFor="profissao">Profissão</Label>
+                     <Input id="profissao" value={formData.profissao} onChange={(e) => handleInputChange('profissao', e.target.value)} placeholder="Profissão do paciente" />
+                   </div>
+                   <div>
+                     <Label htmlFor="status">Status</Label>
+                     <Select value={formData.status.toString()} onValueChange={(value) => handleInputChange('status', value)}>
+                       <SelectTrigger>
+                         <SelectValue placeholder="Selecione o status" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="0">Inativo</SelectItem>
+                         <SelectItem value="1">Ativo</SelectItem>
+                       </SelectContent>
+                     </Select>
+                   </div>
+                   <div>
+                     <Label htmlFor="cor">Cor de Identificação</Label>
+                     <div className="flex items-center space-x-2">
+                       <Input id="cor" type="color" value={formData.cor} onChange={(e) => handleInputChange('cor', e.target.value)} className="w-16 h-10 p-1 border rounded" />
+                       <Input value={formData.cor} onChange={(e) => handleInputChange('cor', e.target.value)} placeholder="#3B82F6" className="flex-1" />
+                     </div>
+                     <p className="text-xs text-muted-foreground mt-1">Escolha uma cor para identificar o paciente na agenda</p>
+                   </div>
+                   <div>
+                     <Label htmlFor="observacao_geral">Observações Gerais</Label>
+                     <Textarea id="observacao_geral" value={formData.observacao_geral} onChange={(e) => handleInputChange('observacao_geral', e.target.value)} placeholder="Observações importantes sobre o paciente" rows={3} />
+                   </div>
+                 </div>
+               </TabsContent>
+             </Tabs>
            ) : (
              // Formulário completo para edição
              <>

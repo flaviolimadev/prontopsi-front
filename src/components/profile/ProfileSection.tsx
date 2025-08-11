@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Camera, User, Edit, Save, X, Loader2, Palette, UserCircle, Building2, FileText } from "lucide-react";
+import { Camera, User, Edit, Save, X, Loader2, Palette, UserCircle, FileText } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { PlanBadge } from "@/components/subscription/PlanBadge";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -23,10 +23,7 @@ export const ProfileSection = () => {
     full_name: "",
     email: "",
     phone: "",
-    crp: "",
-    clinic_name: "",
-    address: "",
-    bio: ""
+    crp: ""
   });
 
   useEffect(() => {
@@ -35,10 +32,7 @@ export const ProfileSection = () => {
         full_name: `${profile.nome || ''} ${profile.sobrenome || ''}`.trim() || profile.full_name || "",
         email: profile.email || "",
         phone: profile.phone || "",
-        crp: profile.crp || "",
-        clinic_name: profile.clinic_name || "",
-        address: profile.address || "",
-        bio: profile.bio || ""
+        crp: profile.crp || ""
       });
     }
   }, [profile]);
@@ -48,10 +42,7 @@ export const ProfileSection = () => {
       nome: formData.full_name.split(' ')[0] || formData.full_name,
       sobrenome: formData.full_name.split(' ').slice(1).join(' ') || '',
       phone: formData.phone,
-      crp: formData.crp,
-      clinic_name: formData.clinic_name,
-      address: formData.address,
-      bio: formData.bio
+      crp: formData.crp
     });
     
     if (success) {
@@ -65,10 +56,7 @@ export const ProfileSection = () => {
         full_name: profile.full_name || "",
         email: profile.email || "",
         phone: profile.phone || "",
-        crp: profile.crp || "",
-        clinic_name: profile.clinic_name || "",
-        address: profile.address || "",
-        bio: profile.bio || ""
+        crp: profile.crp || ""
       });
     }
     setIsEditing(false);
@@ -156,10 +144,6 @@ export const ProfileSection = () => {
               <TabsTrigger value="personal" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 Dados Pessoais
-              </TabsTrigger>
-              <TabsTrigger value="professional" className="flex items-center gap-2">
-                <Building2 className="w-4 h-4" />
-                Profissional
               </TabsTrigger>
             </TabsList>
 
@@ -283,53 +267,7 @@ export const ProfileSection = () => {
               </div>
             </TabsContent>
 
-            {/* Tab - Informações Profissionais */}
-            <TabsContent value="professional" className="space-y-6 mt-6">
-              <div className="space-y-4">
-                {/* Nome da Clínica */}
-                <div className="space-y-2">
-                  <Label htmlFor="clinic-name">Nome da Clínica</Label>
-                  <Input
-                    id="clinic-name"
-                    value={formData.clinic_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, clinic_name: e.target.value }))}
-                    placeholder="Nome da sua clínica ou consultório"
-                    disabled={!isEditing}
-                    className={!isEditing ? "bg-muted/50" : ""}
-                  />
-                </div>
 
-                {/* Endereço */}
-                <div className="space-y-2">
-                  <Label htmlFor="address">Endereço</Label>
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                    placeholder="Endereço completo da clínica"
-                    disabled={!isEditing}
-                    className={!isEditing ? "bg-muted/50" : ""}
-                  />
-                </div>
-
-                {/* Biografia */}
-                <div className="space-y-2">
-                  <Label htmlFor="bio">Biografia</Label>
-                  <Textarea
-                    id="bio"
-                    value={formData.bio}
-                    onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-                    placeholder="Conte um pouco sobre sua experiência profissional, especialidades, etc."
-                    disabled={!isEditing}
-                    className={!isEditing ? "bg-muted/50" : ""}
-                    rows={4}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Esta informação pode ser exibida para seus pacientes.
-                  </p>
-                </div>
-              </div>
-            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>

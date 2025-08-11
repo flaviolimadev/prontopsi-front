@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Search, 
@@ -28,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAvatarUrl } from '@/utils/avatarUtils';
 import { Paciente } from '@/hooks/usePacientes';
 import { EditPacienteModal } from './EditPacienteModal';
+import apiService from '@/services/api.service';
 
 interface PacientesTableProps {
   pacientes: Paciente[];
@@ -68,6 +70,9 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
   const [selectedPacienteForColor, setSelectedPacienteForColor] = useState<Paciente | null>(null);
   const [newColor, setNewColor] = useState('#3B82F6');
   const [updatingColor, setUpdatingColor] = useState(false);
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
+  const [pacienteToDeactivate, setPacienteToDeactivate] = useState<Paciente | null>(null);
+  const [processingDeactivate, setProcessingDeactivate] = useState(false);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
@@ -126,9 +131,42 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
 
   const handleStatusChange = async (paciente: Paciente) => {
     if (paciente.status === 1) {
-      await onDeactivate(paciente.id);
+      setPacienteToDeactivate(paciente);
+      setDeactivateDialogOpen(true);
     } else {
       await onReactivate(paciente.id);
+    }
+  };
+
+  const locallyFormatToday = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const proceedDeactivate = async (cancelFuturePending: boolean) => {
+    if (!pacienteToDeactivate) return;
+    setProcessingDeactivate(true);
+    try {
+      if (cancelFuturePending) {
+        const sessoesResp = await apiService.getAgendaSessoesByPaciente(pacienteToDeactivate.id);
+        const todayStr = locallyFormatToday();
+        const pendentesFuturas = (sessoesResp || []).filter((s: any) => s && s.status === 0 && typeof s.data === 'string' && s.data >= todayStr);
+        if (pendentesFuturas.length > 0) {
+          await Promise.all(
+            pendentesFuturas.map((s: any) => apiService.updateAgendaSessaoStatus(s.id, 3))
+          );
+        }
+      }
+      await onDeactivate(pacienteToDeactivate.id);
+    } catch (err) {
+      console.error('Erro ao desativar paciente e/ou atualizar agendas:', err);
+    } finally {
+      setProcessingDeactivate(false);
+      setDeactivateDialogOpen(false);
+      setPacienteToDeactivate(null);
     }
   };
 
@@ -420,6 +458,37 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Confirmação de Desativação */}
+      {pacienteToDeactivate && (
+        <AlertDialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Desativar paciente</AlertDialogTitle>
+              <AlertDialogDescription>
+                Ao desativar {pacienteToDeactivate.nome}, deseja cancelar ou manter as agendas futuras com status pendente deste paciente?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-2">
+              <AlertDialogCancel disabled={processingDeactivate}>Fechar</AlertDialogCancel>
+              <Button
+                variant="secondary"
+                disabled={processingDeactivate}
+                onClick={() => proceedDeactivate(false)}
+              >
+                Manter agendas
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={processingDeactivate}
+                onClick={() => proceedDeactivate(true)}
+              >
+                {processingDeactivate ? 'Processando...' : 'Cancelar agendas pendentes'}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );

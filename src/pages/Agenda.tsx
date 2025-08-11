@@ -1918,15 +1918,11 @@ export default function Agenda() {
                             </div>
                           </div>
                           
-                          {/* Horário e Duração */}
+                          {/* Horário */}
                           <div className="flex flex-wrap items-center gap-4 mb-2">
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <ClockIcon className="w-4 h-4" />
                               <span>{appointment.horario}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Calendar className="w-4 h-4" />
-                              <span>{appointment.duracao}min</span>
                             </div>
                           </div>
                           
@@ -1944,15 +1940,7 @@ export default function Agenda() {
                             </div>
                           )}
 
-                          {/* Badges de Tipo */}
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <Badge variant="secondary" className="text-xs">
-                              {appointment.tipoDaConsulta}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {appointment.tipoAtendimento}
-                            </Badge>
-                          </div>
+
                         </div>
                       </div>
 
@@ -1994,7 +1982,7 @@ export default function Agenda() {
                             className="flex items-center gap-2 flex-1 sm:flex-none"
                           >
                             <FileText className="w-3 h-3" />
-                            <span>Editar Registro</span>
+                            <span>Registro de Sessão</span>
                           </Button>
                         </div>
                         
