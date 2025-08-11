@@ -21,6 +21,7 @@ import {
   CalendarDays,
   Clock as ClockIcon
 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useCadastroLinks, CadastroSubmission } from '@/hooks/useCadastroLinks';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -77,6 +78,22 @@ export function SubmissionsManager() {
       setSelectedPacienteId('');
     } catch (error) {
       console.error('Erro ao salvar agendamento:', error);
+    }
+  };
+
+  const handleRegisterOnly = async (pacienteId: string) => {
+    if (!selectedSubmission) return;
+    try {
+      await approveSubmission(selectedSubmission.id, { 
+        observacoes,
+        pacienteId
+      });
+      setIsAppointmentEditModalOpen(false);
+      setSelectedSubmission(null);
+      setObservacoes('');
+      setSelectedPacienteId('');
+    } catch (error) {
+      console.error('Erro ao registrar somente o paciente:', error);
     }
   };
 
@@ -204,13 +221,19 @@ export function SubmissionsManager() {
               </TableHeader>
               <TableBody>
                 {pendingSubmissions.map((submission) => (
-                  <TableRow key={submission.id}>
+                    <TableRow key={submission.id}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{submission.pacienteData.nome}</div>
-                        {submission.pacienteData.cpf && (
-                          <div className="text-sm text-muted-foreground">CPF: {submission.pacienteData.cpf}</div>
-                        )}
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={submission.pacienteData?.avatar || ''} />
+                          <AvatarFallback>{submission.pacienteData?.nome?.charAt(0)?.toUpperCase() || 'P'}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">{submission.pacienteData.nome}</div>
+                          {submission.pacienteData.cpf && (
+                            <div className="text-sm text-muted-foreground">CPF: {submission.pacienteData.cpf}</div>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -380,6 +403,15 @@ export function SubmissionsManager() {
           </DialogHeader>
           {selectedSubmission && (
             <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src={selectedSubmission.pacienteData?.avatar || ''} />
+                  <AvatarFallback>
+                    {selectedSubmission.pacienteData?.nome?.charAt(0)?.toUpperCase() || 'P'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-sm text-muted-foreground">Submissão #{selectedSubmission.id.slice(0,8)}</div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium">Nome</Label>
@@ -411,7 +443,11 @@ export function SubmissionsManager() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Contato de Emergência</Label>
-                  <p className="text-sm">{selectedSubmission.pacienteData.contato_emergencia || 'Não informado'}</p>
+                  <p className="text-sm">
+                    {selectedSubmission.pacienteData.contatoEmergenciaNome || selectedSubmission.pacienteData.contato_emergencia || 'Não informado'}
+                    {selectedSubmission.pacienteData.contatoEmergenciaTelefone ? ` - ${selectedSubmission.pacienteData.contatoEmergenciaTelefone}` : ''}
+                    {selectedSubmission.pacienteData.contatoEmergenciaRelacao ? ` (${selectedSubmission.pacienteData.contatoEmergenciaRelacao})` : ''}
+                  </p>
                 </div>
               </div>
 
@@ -436,12 +472,20 @@ export function SubmissionsManager() {
                 </div>
               )}
               
-              {selectedSubmission.pacienteData.endereco && (
-                <div>
-                  <Label className="text-sm font-medium">Endereço</Label>
-                  <p className="text-sm">{selectedSubmission.pacienteData.endereco}</p>
-                </div>
-              )}
+              <div>
+                <Label className="text-sm font-medium">Endereço</Label>
+                <p className="text-sm">
+                  {[
+                    selectedSubmission.pacienteData.enderecoLogradouro,
+                    selectedSubmission.pacienteData.enderecoNumero ? `nº ${selectedSubmission.pacienteData.enderecoNumero}` : undefined,
+                    selectedSubmission.pacienteData.enderecoBairro,
+                    selectedSubmission.pacienteData.enderecoCidade && selectedSubmission.pacienteData.enderecoEstado
+                      ? `${selectedSubmission.pacienteData.enderecoCidade} - ${selectedSubmission.pacienteData.enderecoEstado}`
+                      : (selectedSubmission.pacienteData.enderecoCidade || selectedSubmission.pacienteData.enderecoEstado),
+                    selectedSubmission.pacienteData.enderecoCep
+                  ].filter(Boolean).join(', ') || selectedSubmission.pacienteData.endereco || 'Não informado'}
+                </p>
+              </div>
               
               {selectedSubmission.pacienteData.observacao_geral && (
                 <div>
@@ -545,6 +589,7 @@ export function SubmissionsManager() {
         submission={selectedSubmission}
         selectedPacienteId={selectedPacienteId}
         onSave={handleAppointmentSave}
+        onRegisterOnly={handleRegisterOnly}
       />
     </div>
   );

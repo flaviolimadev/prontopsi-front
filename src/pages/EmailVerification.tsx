@@ -26,21 +26,14 @@ export default function EmailVerification() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Obter email da URL ou da localização
-  const urlParams = new URLSearchParams(window.location.search);
-  const email = urlParams.get('email') || location.state?.email || "";
+  // Obter email da URL (compatível com HashRouter) ou da localização
+  const search = location.search || (typeof window !== 'undefined' ? window.location.hash.split('?')[1] || '' : '');
+  const urlParams = new URLSearchParams(search);
+  const email = urlParams.get('email') || (location.state as any)?.email || "";
 
   console.log('🔧 EmailVerification: Componente carregado');
   console.log('🔧 EmailVerification: Email recebido:', email);
   console.log('🔧 EmailVerification: Auth state:', authState);
-
-  // Verificação de segurança - se não há email, voltar para login
-  React.useEffect(() => {
-    if (!email) {
-      console.log('🔧 EmailVerification: Sem email, redirecionando para login');
-      navigate("/login", { replace: true });
-    }
-  }, [email, navigate]);
 
   const handleVerifyEmail = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -67,7 +67,11 @@ function App() {
                   />
                               <Route
               path="/email-verification"
-              element={<EmailVerification />}
+              element={
+                <PublicRoute>
+                  <EmailVerification />
+                </PublicRoute>
+              }
             />
             <Route
               path="/forgot-password"

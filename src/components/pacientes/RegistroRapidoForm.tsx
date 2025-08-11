@@ -43,19 +43,31 @@ export const RegistroRapidoForm: React.FC<RegistroRapidoFormProps> = ({
   const handleInputChange = (field: string, value: string) => {
     let formattedValue = value;
     
-    // Formatação do telefone
+    // Formatação do telefone - apenas números válidos
     if (field === 'telefone') {
       const numbers = value.replace(/\D/g, '');
-      if (numbers.length <= 11) {
+      
+      // Validar se é um número válido (10 ou 11 dígitos)
+      if (numbers.length >= 10 && numbers.length <= 11) {
+        if (numbers.length === 10) {
+          // Telefone fixo: (11) 3333-3333
+          formattedValue = `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+        } else {
+          // Celular: (11) 99999-9999
+          formattedValue = `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+        }
+      } else if (numbers.length < 10) {
+        // Formatação parcial enquanto digita
         if (numbers.length <= 2) {
           formattedValue = `(${numbers}`;
         } else if (numbers.length <= 6) {
           formattedValue = `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
         } else if (numbers.length <= 10) {
           formattedValue = `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
-        } else {
-          formattedValue = `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
         }
+      } else {
+        // Se exceder 11 dígitos, não formata
+        return;
       }
     }
 
@@ -68,8 +80,11 @@ export const RegistroRapidoForm: React.FC<RegistroRapidoFormProps> = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="ml-2">
-          <Zap className="h-4 w-4 mr-2" />
+        <Button 
+          variant="outline" 
+          className="ml-2 bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 ease-in-out"
+        >
+          <Zap className="h-4 w-4 mr-2 animate-pulse" />
           Registro Rápido
         </Button>
       </DialogTrigger>
@@ -100,7 +115,13 @@ export const RegistroRapidoForm: React.FC<RegistroRapidoFormProps> = ({
               onChange={(e) => handleInputChange('telefone', e.target.value)}
               placeholder="(11) 99999-9999"
               required
+              maxLength={15}
+              pattern="^\(\d{2}\) \d{4,5}-\d{4}$"
+              title="Formato: (11) 99999-9999 ou (11) 3333-3333"
             />
+            <p className="text-xs text-muted-foreground">
+              Digite apenas números. O formato será aplicado automaticamente.
+            </p>
           </div>
 
           <div className="space-y-2">

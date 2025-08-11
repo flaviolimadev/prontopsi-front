@@ -96,7 +96,7 @@ export default function Checkout() {
       });
       
       setTimeout(() => {
-        window.location.href = "/";
+        navigate("/", { replace: true });
       }, 2000);
       
       setIsLoading(false);

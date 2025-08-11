@@ -85,14 +85,14 @@ export default function Financeiro() {
     });
   };
 
-  // Dados a serem exibidos (filtrados ou todos) - ordenados por vencimento mais recente
+  // Dados a serem exibidos (filtrados ou todos) - ordenados por vencimento mais próximo
   const { sortedPagamentos, totalPages, startIndex, endIndex, displayPagamentos } = useMemo(() => {
     const dataToSort = isFiltered ? filteredPagamentos : (pagamentos || []);
     
     const sorted = dataToSort.sort((a, b) => {
       const dateA = new Date(a.vencimento || a.data);
       const dateB = new Date(b.vencimento || b.data);
-      return dateB.getTime() - dateA.getTime(); // Ordem decrescente (mais recente primeiro)
+      return dateA.getTime() - dateB.getTime(); // Ordem crescente (vencimento mais próximo primeiro)
     });
 
     const total = Math.ceil(sorted.length / itemsPerPage);
@@ -1774,21 +1774,39 @@ export default function Financeiro() {
               <CardTitle className="text-lg flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
                 Meus Pagamentos
+                {isFiltered && (
+                  <Badge variant="secondary" className="text-xs ml-2">
+                    <Filter className="w-3 h-3 mr-1" />
+                    Filtrado
+                  </Badge>
+                )}
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 {isFiltered 
                   ? `Exibindo ${displayPagamentos.length} de ${sortedPagamentos.length} pagamentos do período selecionado`
-                  : `Exibindo ${displayPagamentos.length} de ${sortedPagamentos.length} pagamentos (ordenados por vencimento mais recente)`
+                  : `Exibindo ${displayPagamentos.length} de ${sortedPagamentos.length} pagamentos (ordenados por vencimento mais próximo)`
                 }
               </p>
             </div>
-            <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Novo Pagamento
+            <div className="flex items-center gap-2">
+              {isFiltered && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearDateFilter}
+                  className="gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Limpar Filtro
                 </Button>
-              </DialogTrigger>
+              )}
+              <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Novo Pagamento
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Criar Novo Pagamento</DialogTitle>
@@ -1915,6 +1933,7 @@ export default function Financeiro() {
               </DialogContent>
             </Dialog>
           </div>
+        </div>
         </CardHeader>
         <CardContent>
           {pagamentosLoading ? (

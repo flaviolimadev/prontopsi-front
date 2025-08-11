@@ -27,6 +27,23 @@ export interface CadastroSubmission {
     telefone: string;
     dataConsulta?: string;
     horaConsulta?: string;
+    // Campos adicionais opcionais do formulário público
+    nascimento?: string;
+    genero?: string;
+    endereco?: string;
+    enderecoLogradouro?: string;
+    enderecoNumero?: string;
+    enderecoBairro?: string;
+    enderecoCidade?: string;
+    enderecoEstado?: string;
+    enderecoCep?: string;
+    profissao?: string;
+    contato_emergencia?: string;
+    contatoEmergenciaNome?: string;
+    contatoEmergenciaTelefone?: string;
+    contatoEmergenciaRelacao?: string;
+    observacao_geral?: string;
+    avatar?: string;
   };
   observacoes: string | null;
   approvedPacienteId: string | null;
@@ -176,6 +193,9 @@ export const useCadastroLinks = () => {
       setError(null);
       const response = await apiService.approveCadastroSubmission(id, data);
       await fetchSubmissions(); // Recarregar lista
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('cadastroSubmissionsUpdated'));
+      }
       return response;
     } catch (err: any) {
       console.error('Erro ao aprovar submissão:', err);
@@ -193,6 +213,9 @@ export const useCadastroLinks = () => {
       setError(null);
       const response = await apiService.rejectCadastroSubmission(id, data);
       await fetchSubmissions(); // Recarregar lista
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('cadastroSubmissionsUpdated'));
+      }
       return response;
     } catch (err: any) {
       console.error('Erro ao rejeitar submissão:', err);

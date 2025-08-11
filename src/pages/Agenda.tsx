@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarDays, Clock, User, Plus, Edit, Trash2, RefreshCw, AlertCircle, Repeat, ChevronLeft, ChevronRight, ExternalLink, Calendar, MapPin, Clock as ClockIcon, Search, Filter, X, CreditCard, DollarSign, CheckCircle, CheckCircle2, FileText } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -458,6 +459,18 @@ export default function Agenda() {
     }
 
     try {
+      // Checar conflito de horário (mesma data e horário)
+      const conflict = agendaSessoes.some(s => s.data === formData.data && s.horario === formData.horario);
+      if (conflict) {
+        // Sugerir próxima hora cheia
+        const [h, m] = formData.horario.split(':').map(Number);
+        const suggestedHour = String(((h || 0) + 1) % 24).padStart(2, '0') + ':' + String(m || 0).padStart(2, '0');
+        // Tentar criar do mesmo jeito; backend agora valida e retorna erro se conflito
+        // Se backend recusar, exibimos erro; usuário pode ajustar horário manualmente (valor sugerido já preenchido)
+        setFormData(prev => ({ ...prev, horario: suggestedHour }));
+        toast({ title: 'Horário em conflito', description: `Sugerido ${suggestedHour}. Ajuste e confirme.`, variant: 'destructive' });
+        return;
+      }
       if (recurringData.isRecurring) {
         // Criar múltiplas consultas recorrentes
         const startDate = new Date(formData.data + 'T00:00:00');
@@ -533,11 +546,12 @@ export default function Agenda() {
       }
 
       setIsCreateModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao criar sessão:', error);
+      const apiMsg = error?.response?.data?.message || error?.message || 'Erro ao agendar sessão.';
       toast({
         title: "Erro",
-                        description: "Erro ao agendar sessão. Tente novamente.",
+        description: apiMsg,
         variant: "destructive",
       });
     }
@@ -554,6 +568,17 @@ export default function Agenda() {
     }
 
     try {
+      // Checar conflito ao editar
+      const conflict = agendaSessoes.some(s => s.id !== editingAppointment.id && s.data === formData.data && s.horario === formData.horario);
+      if (conflict) {
+        const [h, m] = formData.horario.split(':').map(Number);
+        const suggestedHour = String(((h || 0) + 1) % 24).padStart(2, '0') + ':' + String(m || 0).padStart(2, '0');
+        const proceed = window.confirm(`Já existe uma consulta em ${formData.data} às ${formData.horario}.\n\nDeseja manter mesmo assim?\nClique em Cancelar para ajustar o horário sugerido: ${suggestedHour}.`);
+        if (!proceed) {
+          setFormData(prev => ({ ...prev, horario: suggestedHour }));
+          return;
+        }
+      }
       await updateAgendaSessao(editingAppointment.id, formData);
       setIsEditModalOpen(false);
       setEditingAppointment(null);
@@ -967,6 +992,16 @@ export default function Agenda() {
       case 2: return 'Confirmado';
       case 3: return 'Cancelado';
       default: return 'Desconhecido';
+    }
+  };
+
+  // Atualização rápida de status a partir do badge ao lado do nome
+  const updateAppointmentStatusInline = async (appointment: any, newStatus: number) => {
+    try {
+      await updateAgendaSessao(appointment.id, { status: newStatus });
+      toast({ title: 'Status atualizado', description: `Novo status: ${getStatusLabel(newStatus)}` });
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Não foi possível atualizar o status', variant: 'destructive' });
     }
   };
 
@@ -1702,25 +1737,24 @@ export default function Agenda() {
                     {/* Indicadores de consultas */}
                     {hasAppts && (
                       <div className="absolute bottom-1 left-1 right-1">
-                        <div className="flex flex-wrap gap-0.5 justify-center">
-                          {appointments.slice(0, 3).map((appointment, apptIndex) => (
-                            <div
-                              key={apptIndex}
-                              className={`
-                                w-1.5 h-1.5 rounded-full
-                                ${appointment.status === 2 ? 'bg-green-500' : ''}
-                                ${appointment.status === 3 ? 'bg-red-500' : ''}
-                                ${appointment.status === 1 ? 'bg-blue-500' : ''}
-                                ${appointment.status === 0 ? 'bg-yellow-500' : ''}
-                              `}
-                            />
-                          ))}
-                        </div>
-                        {appointments.length > 3 && (
-                          <div className="text-xs text-muted-foreground text-center mt-0.5">
-                            +{appointments.length - 3}
+                        <div className="flex items-center justify-center gap-1">
+                          {/* Compactar em uma "pílula" com contagem para não quebrar layout */}
+                          <div className="px-1.5 py-0.5 rounded-full bg-muted/60 dark:bg-muted/30 border text-[10px] leading-none flex items-center gap-1">
+                            {/* Até 2 bolinhas para amostra e depois contador */}
+                            {appointments.slice(0, 2).map((appointment, apptIndex) => (
+                              <span
+                                key={apptIndex}
+                                className={`inline-block w-1.5 h-1.5 rounded-full
+                                  ${appointment.status === 2 ? 'bg-green-500' : ''}
+                                  ${appointment.status === 3 ? 'bg-red-500' : ''}
+                                  ${appointment.status === 1 ? 'bg-blue-500' : ''}
+                                  ${appointment.status === 0 ? 'bg-yellow-500' : ''}
+                                `}
+                              />
+                            ))}
+                            <span className="text-muted-foreground">{appointments.length}</span>
                           </div>
-                        )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1865,7 +1899,19 @@ export default function Agenda() {
                               <span>{appointment.patientName}</span>
                             </h3>
                             <div className="flex items-center gap-2">
-                              {getStatusBadge(appointment.status)}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <div className="cursor-pointer">
+                                    {getStatusBadge(appointment.status)}
+                                  </div>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start">
+                                  <DropdownMenuItem onClick={() => updateAppointmentStatusInline(appointment, 0)}>Pendente</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => updateAppointmentStatusInline(appointment, 1)}>Confirmado</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => updateAppointmentStatusInline(appointment, 2)}>Realizado</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => updateAppointmentStatusInline(appointment, 3)}>Cancelado</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                               {agendaPagamentos[appointment.id] && agendaPagamentos[appointment.id].length > 0 && (
                                 <span>{getPagamentoStatusIcon(agendaPagamentos[appointment.id])}</span>
                               )}
@@ -2166,14 +2212,7 @@ export default function Agenda() {
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Textarea
-                placeholder="Descrição do pagamento..."
-                value={pagamentoForm.descricao}
-                onChange={(e) => setPagamentoForm({...pagamentoForm, descricao: e.target.value})}
-              />
-            </div>
+            {/* Descrição removida para simplificar o formulário */}
             <div className="space-y-2">
               <Label>Tipo de Pagamento</Label>
               <Select 
@@ -2191,14 +2230,7 @@ export default function Agenda() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>TXID (opcional)</Label>
-              <Input
-                placeholder="ID da transação..."
-                value={pagamentoForm.txid}
-                onChange={(e) => setPagamentoForm({...pagamentoForm, txid: e.target.value})}
-              />
-            </div>
+            {/* TXID removido para simplificar o formulário */}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsPagamentoModalOpen(false)}>
                 Cancelar
@@ -2221,20 +2253,7 @@ export default function Agenda() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {selectedPagamento && (
-              <div className="bg-muted/30 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Status atual:</span>
-                  <Badge variant={selectedPagamento.status === 1 ? "default" : "secondary"}>
-                    {getStatusLabel(selectedPagamento.status)}
-                  </Badge>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  <div>Tipo: {getTypeLabel(selectedPagamento.type)}</div>
-                  <div>Valor: {formatPagamentoValue(selectedPagamento.value)}</div>
-                </div>
-              </div>
-            )}
+            {/* Bloco de status atual removido para simplificar */}
             <div className="space-y-2">
               <Label>Pacote (opcional)</Label>
               <Select 
@@ -2295,14 +2314,7 @@ export default function Agenda() {
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Textarea
-                placeholder="Descrição do pagamento..."
-                value={pagamentoForm.descricao}
-                onChange={(e) => setPagamentoForm({...pagamentoForm, descricao: e.target.value})}
-              />
-            </div>
+            {/* Descrição removida para simplificar */}
             <div className="space-y-2">
               <Label>Tipo de Pagamento</Label>
               <Select 
@@ -2320,31 +2332,8 @@ export default function Agenda() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Status do Pagamento</Label>
-              <Select 
-                value={pagamentoForm.status?.toString() || '0'} 
-                onValueChange={(value) => setPagamentoForm({...pagamentoForm, status: parseInt(value)})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Pendente</SelectItem>
-                  <SelectItem value="1">Pago</SelectItem>
-                  <SelectItem value="2">Confirmado</SelectItem>
-                  <SelectItem value="3">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>TXID (opcional)</Label>
-              <Input
-                placeholder="ID da transação..."
-                value={pagamentoForm.txid}
-                onChange={(e) => setPagamentoForm({...pagamentoForm, txid: e.target.value})}
-              />
-            </div>
+            {/* Campo de status removido para simplificar */}
+            {/* TXID removido para simplificar */}
             <div className="flex justify-end gap-2">
               <Button 
                 variant="destructive" 

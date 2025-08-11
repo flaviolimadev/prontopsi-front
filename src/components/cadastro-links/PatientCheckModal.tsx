@@ -49,17 +49,25 @@ export function PatientCheckModal({ isOpen, onClose, submission, onPatientSelect
   // Inicializar formulário com dados da submissão
   useEffect(() => {
     if (submission) {
+      const pd = submission.pacienteData || {};
+      const enderecoParts = [
+        pd.enderecoLogradouro,
+        pd.enderecoNumero ? `nº ${pd.enderecoNumero}` : undefined,
+        pd.enderecoBairro,
+        pd.enderecoCidade && pd.enderecoEstado ? `${pd.enderecoCidade} - ${pd.enderecoEstado}` : (pd.enderecoCidade || pd.enderecoEstado),
+        pd.enderecoCep,
+      ].filter(Boolean);
       setFormData({
-        name: submission.pacienteData.nome || '',
-        email: submission.pacienteData.email || '',
-        cpf: submission.pacienteData.cpf || '',
-        telefone: submission.pacienteData.telefone || '',
-        endereco: submission.pacienteData.endereco || '',
-        profissao: submission.pacienteData.profissao || '',
-        nascimento: submission.pacienteData.nascimento || '',
-        genero: submission.pacienteData.genero || '',
-        contato_emergencia: submission.pacienteData.contato_emergencia || '',
-        observacao_geral: submission.pacienteData.observacao_geral || '',
+        name: pd.nome || '',
+        email: pd.email || '',
+        cpf: pd.cpf || '',
+        telefone: pd.telefone || '',
+        endereco: enderecoParts.length ? enderecoParts.join(', ') : (pd.endereco || ''),
+        profissao: pd.profissao || '',
+        nascimento: pd.nascimento || '',
+        genero: pd.genero || '',
+        contato_emergencia: pd.contato_emergencia || [pd.contatoEmergenciaNome, pd.contatoEmergenciaTelefone].filter(Boolean).join(' - '),
+        observacao_geral: pd.observacao_geral || '',
       });
     }
   }, [submission]);
@@ -67,10 +75,27 @@ export function PatientCheckModal({ isOpen, onClose, submission, onPatientSelect
   const handleCreatePatient = async () => {
     try {
       setLoading(true);
-      const newPaciente = await createPaciente({
-        ...formData,
-        status: 1, // Ativo
-      });
+      // Normalizar campos para o backend
+      const generoMap: Record<string, string> = {
+        masculino: 'Masculino',
+        feminino: 'Feminino',
+        outro: 'Prefiro não informar',
+      };
+      const payload: any = {
+        nome: formData.name,
+        email: formData.email,
+        cpf: formData.cpf,
+        telefone: formData.telefone,
+        endereco: formData.endereco,
+        profissao: formData.profissao,
+        nascimento: formData.nascimento || new Date().toISOString().split('T')[0],
+        genero: generoMap[(formData.genero || '').toLowerCase()] || 'Prefiro não informar',
+        contato_emergencia: formData.contato_emergencia,
+        observacao_geral: formData.observacao_geral,
+        avatar: submission?.pacienteData?.avatar || undefined,
+        status: 1,
+      };
+      const newPaciente = await createPaciente(payload);
       onPatientSelected(newPaciente.id);
       onClose();
     } catch (error) {

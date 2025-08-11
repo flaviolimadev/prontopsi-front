@@ -70,8 +70,11 @@ export default function Login() {
                         } else if (result.requiresVerification) {
                     console.log('🔧 Login: Email precisa de verificação, redirecionando...');
                     
-                    // Forçar redirecionamento
-                    window.location.href = `/email-verification?email=${encodeURIComponent(result.email || email)}`;
+                    // Redirecionar usando navigate do React Router (compatível com hash router) e passar email no state
+                    navigate(`/email-verification?email=${encodeURIComponent(result.email || email)}`, { 
+                      replace: true,
+                      state: { email: result.email || email }
+                    });
                   } else {
         console.log('🔧 Login: Erro:', result.error);
         setError(result.error || "Erro ao fazer login");

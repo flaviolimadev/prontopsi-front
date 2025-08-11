@@ -74,9 +74,25 @@ class ApiService {
       (error) => {
         // Tratar erros de autenticação
         if (error.response?.status === 401) {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
+          const requestUrl: string = error.config?.url || '';
+          const isAuthEndpoint = [
+            '/auth/login',
+            '/auth/register',
+            '/auth/verify-email',
+            '/auth/resend-verification',
+            '/auth/request-password-reset',
+            '/auth/verify-reset-code',
+            '/auth/reset-password'
+          ].some((p) => requestUrl.includes(p));
+
+          // Em endpoints de auth, não redirecionar automaticamente; deixar o caller tratar
+          if (!isAuthEndpoint) {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            // Evitar quebrar HashRouter: usar hash quando disponível
+            const base = window.location.origin + window.location.pathname;
+            window.location.href = base + '#/login';
+          }
         }
         return Promise.reject(error);
       }
@@ -594,6 +610,23 @@ class ApiService {
 
   async rejectCadastroSubmission(id: string, data: any) {
     return this.put<any>(`/cadastro-links/submissions/${id}/reject`, data);
+  }
+
+  // Paciente Arquivos
+  async getPacienteFiles(pacienteId: string) {
+    return this.get<any[]>(`/pacientes/${pacienteId}/arquivos`);
+  }
+
+  async uploadPacienteFile(pacienteId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.post<any>(`/pacientes/${pacienteId}/arquivos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
+
+  async deletePacienteFile(pacienteId: string, fileId: string) {
+    return this.delete<any>(`/pacientes/${pacienteId}/arquivos/${fileId}`);
   }
 
   // Links públicos (sem autenticação)

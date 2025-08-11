@@ -17,6 +17,7 @@ import { RegistroRapidoForm } from '@/components/pacientes/RegistroRapidoForm';
 import CadastroLinksManager from '@/components/cadastro-links/CadastroLinksManager';
 import { SubmissionsManager } from '@/components/cadastro-links/SubmissionsManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useCadastroLinks } from '@/hooks/useCadastroLinks';
 
 export default function Pacientes() {
   const {
@@ -35,6 +36,60 @@ export default function Pacientes() {
     applyFilters,
     changePage,
   } = usePacientes();
+
+  const { submissions, fetchSubmissions } = useCadastroLinks();
+  React.useEffect(() => { 
+    fetchSubmissions(); 
+    const handler = () => fetchSubmissions();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('cadastroSubmissionsUpdated', handler);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('cadastroSubmissionsUpdated', handler);
+      }
+    };
+  }, [fetchSubmissions]);
+  const pendingCount = (submissions || []).filter(s => s.status === 'pending').length;
+
+  // Selecionar aba via hash (suporta #solicitacoes e #submissions)
+  const [activeTab, setActiveTab] = React.useState<string>('pacientes');
+  React.useEffect(() => {
+    const resolveTabFromHash = (hash: string | undefined | null) => {
+      const raw = (hash || '').toLowerCase();
+      // Extrair o trecho após o último '#', se houver dois hashes (ex.: '#/pacientes#solicitacoes')
+      const clean = raw.startsWith('#') ? raw.slice(1) : raw;
+      const lastHashIndex = clean.lastIndexOf('#');
+      const anchor = lastHashIndex >= 0 ? clean.slice(lastHashIndex + 1) : clean;
+
+      if (anchor === 'solicitacoes' || anchor === 'submissions' || raw.includes('solicitacoes') || raw.includes('submissions')) {
+        return 'submissions';
+      }
+      if (anchor === 'links' || raw.includes('links')) {
+        return 'links';
+      }
+      if (anchor === 'pacientes' || clean === '/pacientes' || raw.includes('/pacientes')) {
+        return 'pacientes';
+      }
+      return 'pacientes';
+    };
+
+    const syncFromHash = () => {
+      if (typeof window !== 'undefined') {
+        setActiveTab(resolveTabFromHash(window.location.hash));
+      }
+    };
+
+    syncFromHash();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hashchange', syncFromHash);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('hashchange', syncFromHash);
+      }
+    };
+  }, []);
 
   const handleCreatePaciente = async (data: any) => {
     await createPaciente(data);
@@ -86,11 +141,18 @@ export default function Pacientes() {
         </div>
       </div>
 
-      <Tabs defaultValue="pacientes" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="pacientes">Pacientes</TabsTrigger>
           <TabsTrigger value="links">Links de Cadastro</TabsTrigger>
-          <TabsTrigger value="submissions">Solicitações</TabsTrigger>
+          <TabsTrigger value="submissions" className="relative">
+            Solicitações
+            {pendingCount > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center rounded-full bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5">
+                {pendingCount}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pacientes" className="space-y-6">

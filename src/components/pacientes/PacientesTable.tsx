@@ -108,7 +108,9 @@ export const PacientesTable: React.FC<PacientesTableProps> = ({
 
   const handleEditSubmit = async (data: any) => {
     try {
-      await onEdit(data);
+      if (!selectedPaciente) return;
+      // Garantir que o ID seja enviado junto aos dados
+      await onEdit({ id: selectedPaciente.id, ...data });
       setEditModalOpen(false);
       setSelectedPaciente(null);
     } catch (error) {

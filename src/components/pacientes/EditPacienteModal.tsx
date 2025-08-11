@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Save, Loader2, MapPin, Palette, UserCircle, User, Building2, FileText } from 'lucide-react';
+import { Save, Loader2, MapPin, Palette, UserCircle, User, Building2, FileText, Trash2, Phone, Heart, Plus } from 'lucide-react';
 import { useAddressSearch } from '@/hooks/useAddressSearch';
 import { PacienteAvatarUploadModal } from './PacienteAvatarUploadModal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -52,6 +52,14 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
   });
   const [showAvatarModal, setShowAvatarModal] = useState(false);
 
+  // Contatos de emergência (igual ao perfil do paciente)
+  const [emergencyContacts, setEmergencyContacts] = useState<Array<{ id: string; nome: string; telefone: string }>>([]);
+  const [newEmergencyContact, setNewEmergencyContact] = useState<{ nome: string; telefone: string }>({ nome: '', telefone: '' });
+
+  // Medicações (igual ao perfil do paciente)
+  const [medications, setMedications] = useState<Array<{ id: string; nome: string; prescricao: string }>>([]);
+  const [newMedication, setNewMedication] = useState<{ nome: string; prescricao: string }>({ nome: '', prescricao: '' });
+
   // Carregar dados do paciente quando o modal abrir
   useEffect(() => {
     if (paciente && open) {
@@ -68,6 +76,19 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
         cpf: paciente.cpf || "",
         gender: paciente.genero || "",
       });
+      // Carregar contatos de emergência existentes
+      if (Array.isArray(paciente.contatos_emergencia)) {
+        setEmergencyContacts(paciente.contatos_emergencia);
+      } else {
+        setEmergencyContacts([]);
+      }
+
+      // Carregar medicações existentes
+      if (Array.isArray(paciente.medicacoes)) {
+        setMedications(paciente.medicacoes);
+      } else {
+        setMedications([]);
+      }
     }
   }, [paciente, open]);
 
@@ -85,7 +106,10 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
         observacao_geral: editForm.notes,
         cpf: editForm.cpf,
         genero: editForm.gender,
-        status: editForm.status === "ativo" ? 1 : 0
+        status: editForm.status === "ativo" ? 1 : 0,
+        // Incluir listas estruturadas como na página de perfil
+        contatos_emergencia: emergencyContacts,
+        medicacoes: medications
       };
 
       await onSubmit(pacienteData);
@@ -93,6 +117,38 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
     } catch (error) {
       console.error('Erro ao atualizar paciente:', error);
     }
+  };
+
+  const handleAddEmergencyContact = () => {
+    if (!newEmergencyContact.nome.trim() || !newEmergencyContact.telefone.trim()) {
+      return;
+    }
+    const contact = {
+      id: Date.now().toString(),
+      nome: newEmergencyContact.nome.trim(),
+      telefone: newEmergencyContact.telefone.trim(),
+    };
+    setEmergencyContacts(prev => [...prev, contact]);
+    setNewEmergencyContact({ nome: '', telefone: '' });
+  };
+
+  const handleRemoveEmergencyContact = (contactId: string) => {
+    setEmergencyContacts(prev => prev.filter(c => c.id !== contactId));
+  };
+
+  const handleAddMedication = () => {
+    if (!newMedication.nome.trim()) return;
+    const med = {
+      id: Date.now().toString(),
+      nome: newMedication.nome.trim(),
+      prescricao: newMedication.prescricao.trim(),
+    };
+    setMedications(prev => [...prev, med]);
+    setNewMedication({ nome: '', prescricao: '' });
+  };
+
+  const handleRemoveMedication = (medId: string) => {
+    setMedications(prev => prev.filter(m => m.id !== medId));
   };
 
   const formatCEP = (cep: string) => {
@@ -183,7 +239,7 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Tabs defaultValue="avatar" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="avatar" className="flex items-center gap-2">
                 <UserCircle className="w-4 h-4" />
                 Foto
@@ -199,6 +255,10 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
               <TabsTrigger value="professional" className="flex items-center gap-2">
                 <Building2 className="w-4 h-4" />
                 Profissional
+              </TabsTrigger>
+              <TabsTrigger value="health" className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Saúde
               </TabsTrigger>
             </TabsList>
 
@@ -300,6 +360,136 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
                       <SelectItem value="Prefiro não informar">Prefiro não informar</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Saúde (Contatos de Emergência e Medicações) movidos para aba dedicada */}
+              </div>
+            </TabsContent>
+
+            {/* Tab - Saúde */}
+            <TabsContent value="health" className="space-y-6 mt-6">
+              <div className="space-y-6">
+                {/* Contatos de Emergência */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">Contatos de Emergência</h3>
+                  </div>
+                  
+                  {emergencyContacts.length > 0 ? (
+                    <div className="space-y-2">
+                      {emergencyContacts.map((contact) => (
+                        <div key={contact.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+                          <div>
+                            <div className="font-medium text-sm">{contact.nome}</div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400">{contact.telefone}</div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveEmergencyContact(contact.id)}
+                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+                      Nenhum contato de emergência adicionado
+                    </div>
+                  )}
+                  
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Nome do responsável"
+                        value={newEmergencyContact.nome}
+                        onChange={(e) => setNewEmergencyContact({ ...newEmergencyContact, nome: e.target.value })}
+                        className="h-9 text-sm"
+                      />
+                      <Input
+                        placeholder="Telefone"
+                        value={newEmergencyContact.telefone}
+                        onChange={(e) => setNewEmergencyContact({ ...newEmergencyContact, telefone: e.target.value })}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <Button 
+                      type="button" 
+                      onClick={handleAddEmergencyContact} 
+                      disabled={!newEmergencyContact.nome.trim() || !newEmergencyContact.telefone.trim()}
+                      size="sm"
+                      className="w-full"
+                    >
+                      Adicionar Contato
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Medicações */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">Medicações</h3>
+                  </div>
+                  
+                  {medications.length > 0 ? (
+                    <div className="space-y-2">
+                      {medications.map((med) => (
+                        <div key={med.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm">{med.nome}</div>
+                              {med.prescricao && (
+                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{med.prescricao}</div>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveMedication(med.id)}
+                              className="h-8 w-8 p-0 text-orange-500 hover:text-orange-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+                      Nenhuma medicação adicionada
+                    </div>
+                  )}
+                  
+                  <div className="space-y-3">
+                    <Input
+                      placeholder="Nome do medicamento"
+                      value={newMedication.nome}
+                      onChange={(e) => setNewMedication({ ...newMedication, nome: e.target.value })}
+                      className="h-9 text-sm"
+                    />
+                    <Textarea
+                      placeholder="Prescrição do médico"
+                      value={newMedication.prescricao}
+                      onChange={(e) => setNewMedication({ ...newMedication, prescricao: e.target.value })}
+                      rows={2}
+                      className="text-sm"
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={handleAddMedication} 
+                      disabled={!newMedication.nome.trim()}
+                      size="sm"
+                      className="w-full"
+                    >
+                      Adicionar Medicação
+                    </Button>
+                  </div>
                 </div>
               </div>
             </TabsContent>
@@ -429,14 +619,7 @@ export const EditPacienteModal: React.FC<EditPacienteModalProps> = ({
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Contato de Emergência</Label>
-                  <Input
-                    placeholder="Nome e telefone do contato de emergência"
-                    value={editForm.emergency_contact}
-                    onChange={(e) => handleInputChange('emergency_contact', e.target.value)}
-                  />
-                </div>
+                {/* Contato de Emergência removido desta seção (mantido na aba de dados pessoais estruturado) */}
 
                 <div className="space-y-2">
                   <Label>Observações Gerais</Label>

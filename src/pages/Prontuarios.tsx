@@ -65,6 +65,13 @@ export default function Prontuarios() {
     date: new Date().toISOString().split('T')[0]
   });
 
+  // Utilitário para interpretar datas YYYY-MM-DD como data local (evita voltar 1 dia por fuso)
+  const toLocalDate = (yyyyMMdd?: string) => {
+    if (!yyyyMMdd) return null;
+    const [y, m, d] = yyyyMMdd.split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  };
+
   // Reset quando patientId mudar
   useEffect(() => {
     if (patientId) {
@@ -165,7 +172,8 @@ export default function Prontuarios() {
 
     const newEntry: ProntuarioEntry = {
       id: Date.now().toString(),
-      date: newEntryForm.date,
+      // Normalizar para ISO local (meia-noite local) evitando fuso
+      date: toLocalDate(newEntryForm.date)?.toISOString().split('T')[0] || newEntryForm.date,
       type: newEntryForm.type,
       content: newEntryForm.content,
       psychologist: "Dra. Maria Silva" // Substitua pelo usuário logado
@@ -626,7 +634,7 @@ export default function Prontuarios() {
                           <div>
                       <div className="flex items-center gap-2">
                               <Calendar className="w-4 h-4 text-muted-foreground" />
-                              <span className="font-medium">{new Date(entry.date).toLocaleDateString('pt-BR')}</span>
+                          <span className="font-medium">{toLocalDate(entry.date)?.toLocaleDateString('pt-BR')}</span>
                               <Badge variant="secondary">{entry.type}</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">{entry.psychologist}</p>

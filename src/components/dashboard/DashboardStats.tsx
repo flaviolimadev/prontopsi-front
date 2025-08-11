@@ -83,7 +83,7 @@ export function DashboardStats() {
           icon: CreditCard,
         },
         {
-          title: "Atendimentos concluídos",
+          title: "Sessões Concluídas",
           value: "0",
           description: "Carregando...",
           icon: CheckCircle,
@@ -139,10 +139,10 @@ export function DashboardStats() {
         icon: CreditCard,
       },
       {
-        title: "Atendimentos concluídos",
+        title: "Sessões Concluídas",
         value: totalCompleted.toString(),
         description: totalCompleted === 0 
-          ? "Nenhum atendimento" 
+          ? "Nenhuma sessão" 
           : `${totalCompleted} realizadas`,
         icon: CheckCircle,
       },

@@ -176,7 +176,7 @@ export function QuickLinksSection({ className }: QuickLinksSectionProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Link className="w-5 h-5" />
-            Links de Indicação
+            Links de Cadastro
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -197,7 +197,7 @@ export function QuickLinksSection({ className }: QuickLinksSectionProps) {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Link className="w-5 h-5" />
-                Links de Indicação
+                Links de Cadastro
               </CardTitle>
               <CardDescription>
                 Acesse e compartilhe rapidamente seus links de cadastro
@@ -236,7 +236,7 @@ export function QuickLinksSection({ className }: QuickLinksSectionProps) {
             <div className="text-center py-4">
               <Link className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
               <p className="text-sm text-muted-foreground mb-3">
-                Você ainda não criou nenhum link de indicação
+                Você ainda não criou nenhum link de cadastro
               </p>
               <Button size="sm" asChild>
                 <a href="/#/pacientes#links">Criar primeiro link</a>

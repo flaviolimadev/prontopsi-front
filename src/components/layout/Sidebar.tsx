@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { useDarkMode } from "../theme/DarkModeProvider";
@@ -26,10 +26,11 @@ import {
   Crown,
   Clock,
 } from "lucide-react";
+import { useCadastroLinks } from "@/hooks/useCadastroLinks";
 
 // Importar as logos
-import logoWhite from "@/assets/img/ProntuPsi - Horizontal Principal Branco.svg";
-import logoColor from "@/assets/img/ProntuPsi - Principal.svg";
+import logoWhite from "@/assets/img/ProntuPsi - Principal Branco sem slogan.png";
+import logoColor from "@/assets/img/ProntuPsi - Principal sem slogan.png";
 import logoSymbol from "@/assets/img/Simbolo - Principal.svg";
 
 const navigation = [
@@ -54,6 +55,10 @@ export function Sidebar({ className }: SidebarProps) {
   const { darkMode, toggleDarkMode } = useDarkMode();
   const { subscription } = useSubscription();
   const { isCollapsed, setIsCollapsed } = useSidebar();
+  const { submissions, fetchSubmissions } = useCadastroLinks();
+
+  useEffect(() => { fetchSubmissions(); }, [fetchSubmissions]);
+  const pendingCount = useMemo(() => (submissions || []).filter(s => s.status === 'pending').length, [submissions]);
 
 
 
@@ -168,7 +173,14 @@ export function Sidebar({ className }: SidebarProps) {
                   
                   {!isCollapsed && (
                     <div className="ml-3 flex-1">
-                      <div className="font-semibold">{item.name}</div>
+                      <div className="font-semibold flex items-center gap-2">
+                        <span>{item.name}</span>
+                        {item.name === 'Pacientes' && pendingCount > 0 && (
+                          <span className="inline-flex items-center justify-center rounded-full bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5">
+                            {pendingCount}
+                          </span>
+                        )}
+                      </div>
                       <div className={cn(
                         "text-xs transition-all duration-200",
                         isActive 

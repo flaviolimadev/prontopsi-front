@@ -28,6 +28,7 @@ interface AppointmentEditModalProps {
   submission: any;
   selectedPacienteId?: string;
   onSave: (appointmentData: any) => Promise<void>;
+  onRegisterOnly?: (pacienteId: string) => Promise<void>;
 }
 
 interface AppointmentFormData {
@@ -54,8 +55,8 @@ interface RecurringAppointmentData {
   daySchedules: { [key: number]: string };
 }
 
-export function AppointmentEditModal({ isOpen, onClose, submission, selectedPacienteId, onSave }: AppointmentEditModalProps) {
-  const { pacientes } = usePacientes();
+export function AppointmentEditModal({ isOpen, onClose, submission, selectedPacienteId, onSave, onRegisterOnly }: AppointmentEditModalProps) {
+  const { pacientes, fetchPacientes } = usePacientes();
   const { createAgendaSessao } = useAgendaSessoes();
   const { pacotes, loading: pacotesLoading } = usePacotes();
   const { createPagamento } = usePagamentos();
@@ -102,6 +103,13 @@ export function AppointmentEditModal({ isOpen, onClose, submission, selectedPaci
       }
     }
   }, [submission]);
+
+  // Buscar pacientes quando abrir para garantir lista atualizada
+  useEffect(() => {
+    if (isOpen) {
+      fetchPacientes({ page: 1, limit: 100 });
+    }
+  }, [isOpen, fetchPacientes]);
 
   // Definir o paciente selecionado quando o modal abrir
   useEffect(() => {
@@ -657,23 +665,45 @@ export function AppointmentEditModal({ isOpen, onClose, submission, selectedPaci
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-between gap-2">
             <Button variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button 
-              onClick={handleSave} 
-              disabled={loading || !formData.pacienteId || (!recurringData.isRecurring && !formData.horario)}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                'Salvar Agendamento'
-              )}
-            </Button>
+            <div className="ml-auto flex gap-2">
+              <Button 
+                variant="secondary" 
+                onClick={async () => {
+                  if (onRegisterOnly && formData.pacienteId) {
+                    try {
+                      setLoading(true);
+                      await onRegisterOnly(formData.pacienteId);
+                      onClose();
+                    } catch (e) {
+                      console.error('Erro ao registrar somente o paciente:', e);
+                    } finally {
+                      setLoading(false);
+                    }
+                  } else {
+                    onClose();
+                  }
+                }}
+              >
+                Somente Cadastrar Paciente
+              </Button>
+              <Button 
+                onClick={handleSave} 
+                disabled={loading || !formData.pacienteId || (!recurringData.isRecurring && !formData.horario)}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar Agendamento'
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

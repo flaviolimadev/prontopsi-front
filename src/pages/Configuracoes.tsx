@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { User, Bell, Calendar, DollarSign, Shield, Crown, CreditCard as CreditCardIcon, Key, Trash2, Download, Eye, EyeOff } from "lucide-react";
 import { ProfileSection } from "@/components/profile/ProfileSection";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import apiService from "@/services/api.service";
 
 export default function Configuracoes() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading } = useSubscription();
   const { user } = useAuth();
@@ -165,7 +167,7 @@ export default function Configuracoes() {
 
   const handleUpgradePlan = () => {
     // Redirecionar para página de checkout
-    window.location.href = "/checkout";
+    navigate("/checkout", { replace: true });
   };
 
   const handleChangeCard = () => {
@@ -218,7 +220,7 @@ export default function Configuracoes() {
       
       // Redirecionar para logout após alguns segundos
       setTimeout(() => {
-        window.location.href = "/login";
+        navigate("/login", { replace: true });
       }, 3000);
     } catch (error: any) {
       toast({

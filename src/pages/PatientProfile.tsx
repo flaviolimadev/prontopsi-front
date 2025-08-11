@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
@@ -85,21 +85,16 @@ import {
   Star,
   MessageSquare,
   Save,
-  Palette,
-  UserCircle,
-  Building2,
 } from "lucide-react";
 
 import { usePacientes } from "@/hooks/usePacientes";
 import { PacienteForm } from "@/components/pacientes/PacienteForm";
 import { SessionRecordModal } from "@/components/pacientes/SessionRecordModal";
-import { PacienteAvatarUploadModal } from "@/components/pacientes/PacienteAvatarUploadModal";
 import { apiService } from "@/services/api.service";
 import { useAgendaSessoesReal } from "@/hooks/useAgendaSessoesReal";
 import { usePagamentos } from "@/hooks/usePagamentos";
 import { useAddressSearch } from "@/hooks/useAddressSearch";
 import { useFinancialVisibility } from "@/contexts/FinancialVisibilityContext";
-import { getAvatarUrl } from "@/utils/avatarUtils";
 
 export default function PatientProfile() {
   const { id: patientId } = useParams<{ id: string }>();
@@ -111,6 +106,7 @@ export default function PatientProfile() {
   const [patientFinancials, setPatientFinancials] = useState<any[]>([]);
   const [patientRecords, setPatientRecords] = useState<any[]>([]);
   const [patientFiles, setPatientFiles] = useState<any[]>([]);
+  const [fileUploading, setFileUploading] = useState(false);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -124,7 +120,6 @@ export default function PatientProfile() {
   const [newMedication, setNewMedication] = useState({ nome: '', prescricao: '' });
   const [newEmergencyContact, setNewEmergencyContact] = useState({ nome: '', telefone: '' });
   const [notes, setNotes] = useState('');
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
 
   const {
     getPaciente,
@@ -197,7 +192,6 @@ export default function PatientProfile() {
         notes: pacienteData.observacao_geral,
         status: pacienteData.status === 1 ? "ativo" : "inativo",
         cpf: pacienteData.cpf,
-        avatar: pacienteData.avatar, // Adicionando o campo avatar
         sessions_count: 0, // Mock data
         last_session: null, // Mock data
         created_at: pacienteData.createdAt,
@@ -292,17 +286,12 @@ export default function PatientProfile() {
         }
       ]);
       
-      setPatientFiles([
-        {
-          id: '1',
-          patient_id: patientId,
-          name: 'Avaliação Psicológica.pdf',
-          file_type: 'application/pdf',
-          file_size: 245760,
-          category: 'relatorio',
-          created_at: '2024-01-15T10:00:00Z'
-        }
-      ]);
+      try {
+        const files = await apiService.getPacienteFiles(patientId);
+        setPatientFiles(files || []);
+      } catch (e) {
+        setPatientFiles([]);
+      }
     } catch (error: any) {
       console.error('Erro ao carregar paciente:', error);
       toast({
@@ -411,20 +400,6 @@ export default function PatientProfile() {
         title: "Erro",
         description: "Erro ao atualizar paciente.",
         variant: "destructive",
-      });
-    }
-  };
-
-  const handleAvatarSuccess = (avatarUrl: string) => {
-    // O paciente será atualizado automaticamente através do hook
-    setShowAvatarModal(false);
-    // Recarregar dados do paciente para mostrar o novo avatar
-    fetchPatientData();
-    // Atualizar o estado local do paciente com o novo avatar
-    if (patient) {
-      setPatient({
-        ...patient,
-        avatar: avatarUrl
       });
     }
   };
@@ -780,11 +755,6 @@ export default function PatientProfile() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-8">
               <Avatar className="w-24 h-24 border-4 border-white/20">
-                <AvatarImage 
-                  src={getAvatarUrl(patient?.avatar)} 
-                  className="object-cover"
-                  alt={`Avatar de ${patient.name}`}
-                />
                 <AvatarFallback className="bg-white/20 text-white text-2xl font-bold backdrop-blur-sm">
                   {initials}
                 </AvatarFallback>
@@ -991,113 +961,64 @@ export default function PatientProfile() {
           <TabsContent value="perfil" className="space-y-8 mt-10">
             <Card className="overflow-hidden shadow-xl border-0">
               <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b py-8">
-                <CardTitle className="text-2xl">Perfil do Paciente</CardTitle>
+                <CardTitle className="text-2xl">Informações Pessoais Completas</CardTitle>
                 <CardDescription className="text-lg">
-                  Informações completas e organizadas do paciente
+                  Dados completos e atualizados do paciente
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-10">
-                <Tabs defaultValue="dados-pessoais" className="w-full">
-                  <TabsList className="grid w-full grid-cols-4 mb-8">
-                    <TabsTrigger value="dados-pessoais" className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      Dados Pessoais
-                    </TabsTrigger>
-                    <TabsTrigger value="dados-complementares" className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                  {/* Informações Básicas */}
+                  <div className="space-y-8">
+                    <h4 className="font-bold text-xl flex items-center gap-3 text-primary border-b pb-3">
+                      <User className="w-6 h-6" />
+                      Dados Básicos
+                    </h4>
+                    <div className="space-y-6">
+                      <div className="flex items-start gap-4">
+                        <Mail className="w-6 h-6 text-muted-foreground mt-1" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Email</p>
+                          <p className="text-lg font-medium">{patient.email || "Não informado"}</p>
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="flex items-start gap-4">
+                        <Phone className="w-6 h-6 text-muted-foreground mt-1" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Telefone</p>
+                          <p className="text-lg font-medium">{patient.phone || "Não informado"}</p>
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="flex items-start gap-4">
+                        <Calendar className="w-6 h-6 text-muted-foreground mt-1" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Data de Nascimento</p>
+                          <p className="text-lg font-medium">
+                            {patient.birth_date
+                              ? `${format(new Date(patient.birth_date), "dd/MM/yyyy", { locale: ptBR })} (${calculateAge(patient.birth_date)} anos)`
+                              : "Não informada"}
+                          </p>
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="flex items-start gap-4">
+                        <User className="w-6 h-6 text-muted-foreground mt-1" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Gênero</p>
+                          <p className="text-lg font-medium">{patient.gender || "Não informado"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Informações Complementares */}
+                  <div className="space-y-8">
+                    <h4 className="font-bold text-xl flex items-center gap-3 text-primary border-b pb-3">
+                      <MapPin className="w-6 h-6" />
                       Dados Complementares
-                    </TabsTrigger>
-                    <TabsTrigger value="medico" className="flex items-center gap-2">
-                      <Heart className="w-4 h-4" />
-                      Informações Médicas
-                    </TabsTrigger>
-                    <TabsTrigger value="observacoes" className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4" />
-                      Observações
-                    </TabsTrigger>
-                  </TabsList>
-
-                  {/* Subtabs Content */}
-                  <TabsContent value="dados-pessoais" className="space-y-6">
-                    {/* Avatar do Paciente */}
-                    <div className="flex items-center gap-6 p-6 bg-muted/30 rounded-lg border">
-                      <Avatar className="w-20 h-20">
-                        <AvatarImage 
-                          src={getAvatarUrl(patient?.avatar)} 
-                          className="object-cover"
-                          alt={`Avatar de ${patient.name}`}
-                        />
-                        <AvatarFallback className="text-2xl font-bold">
-                          {patient?.name?.charAt(0)?.toUpperCase() || 'P'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="text-xl font-semibold">Foto do Paciente</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {patient?.avatar ? "Avatar personalizado" : "Avatar padrão"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="space-y-6">
-                        <div className="flex items-start gap-4">
-                          <Mail className="w-6 h-6 text-muted-foreground mt-1" />
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Email</p>
-                            <p className="text-lg font-medium">{patient.email || "Não informado"}</p>
-                          </div>
-                        </div>
-                        <Separator />
-                        <div className="flex items-start gap-4">
-                          <Phone className="w-6 h-6 text-muted-foreground mt-1" />
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Telefone</p>
-                            <p className="text-lg font-medium">{patient.phone || "Não informado"}</p>
-                          </div>
-                        </div>
-                        <Separator />
-                        <div className="flex items-start gap-4">
-                          <Calendar className="w-6 h-6 text-muted-foreground mt-1" />
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Data de Nascimento</p>
-                            <p className="text-lg font-medium">
-                              {patient.birth_date
-                                ? `${format(new Date(patient.birth_date), "dd/MM/yyyy", { locale: ptBR })} (${calculateAge(patient.birth_date)} anos)`
-                                : "Não informada"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="space-y-6">
-                        <div className="flex items-start gap-4">
-                          <User className="w-6 h-6 text-muted-foreground mt-1" />
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Gênero</p>
-                            <p className="text-lg font-medium">{patient.gender || "Não informado"}</p>
-                          </div>
-                        </div>
-                        <Separator />
-                        <div className="flex items-start gap-4">
-                          <CreditCard className="w-6 h-6 text-muted-foreground mt-1" />
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">CPF</p>
-                            <p className="text-lg font-medium">{patient.cpf || "Não informado"}</p>
-                          </div>
-                        </div>
-                        <Separator />
-                        <div className="flex items-start gap-4">
-                          <Briefcase className="w-6 h-6 text-muted-foreground mt-1" />
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Profissão</p>
-                            <p className="text-lg font-medium">{patient.profession || "Não informada"}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="dados-complementares" className="space-y-6">
+                    </h4>
                     <div className="space-y-6">
                       <div className="flex items-start gap-4">
                         <MapPin className="w-6 h-6 text-muted-foreground mt-1" />
@@ -1123,9 +1044,17 @@ export default function PatientProfile() {
                         </div>
                       </div>
                     </div>
-                  </TabsContent>
-
-                  <TabsContent value="medico" className="space-y-6">
+                  </div>
+                </div>
+                
+                {/* Informações Médicas e Observações */}
+                <div key="medical-info">
+                  <Separator className="my-10" />
+                  <div className="space-y-8">
+                    <h4 className="font-bold text-xl flex items-center gap-3 text-primary border-b pb-3">
+                      <Heart className="w-6 h-6" />
+                      Informações Médicas e Observações
+                    </h4>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                       <div className="flex items-start gap-4">
                         <AlertCircle className="w-6 h-6 text-red-500 mt-1" />
@@ -1210,10 +1139,7 @@ export default function PatientProfile() {
                         </div>
                       </div>
                     </div>
-                  </TabsContent>
-
-                  <TabsContent value="observacoes" className="space-y-6">
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-4 mt-6">
                       <MessageSquare className="w-6 h-6 text-blue-500 mt-1" />
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-2">
@@ -1233,8 +1159,8 @@ export default function PatientProfile() {
                         </p>
                       </div>
                     </div>
-                  </TabsContent>
-                </Tabs>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1525,12 +1451,65 @@ export default function PatientProfile() {
 
           <TabsContent value="arquivos" className="space-y-6 mt-10">
             <Card className="shadow-xl">
-              <CardContent className="p-10">
-                <div className="text-center">
-                  <FolderOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">Arquivos do Paciente</h3>
-                  <p className="text-muted-foreground">Seção em desenvolvimento</p>
+              <CardContent className="p-10 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FolderOpen className="w-6 h-6 text-muted-foreground" />
+                    <h3 className="text-xl font-semibold">Arquivos do Paciente</h3>
+                  </div>
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !patientId) return;
+                        try {
+                          setFileUploading(true);
+                          await apiService.uploadPacienteFile(patientId, file);
+                          const files = await apiService.getPacienteFiles(patientId);
+                          setPatientFiles(files || []);
+                        } finally {
+                          setFileUploading(false);
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                    />
+                    <Button disabled={fileUploading} variant="outline" size="sm" asChild>
+                      <span>{fileUploading ? 'Enviando...' : 'Enviar Arquivo'}</span>
+                    </Button>
+                  </label>
                 </div>
+
+                {(!patientFiles || patientFiles.length === 0) ? (
+                  <div className="text-center py-12">
+                    <FolderOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Nenhum arquivo enviado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {patientFiles.map((file: any) => (
+                      <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate max-w-[50vw]">{file.nome}</p>
+                          <p className="text-xs text-muted-foreground">{file.tipo || 'arquivo'} • {(file.tamanho || 0) / 1024 | 0} KB</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {file.url && (
+                            <Button asChild size="sm" variant="outline">
+                              <a href={file.url} target="_blank" rel="noreferrer">Abrir</a>
+                            </Button>
+                          )}
+                          <Button size="sm" variant="destructive" onClick={async () => {
+                            await apiService.deletePacienteFile(patientId, file.id);
+                            const files = await apiService.getPacienteFiles(patientId);
+                            setPatientFiles(files || []);
+                          }}>Excluir</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1539,25 +1518,6 @@ export default function PatientProfile() {
         {/* Modal de Edição */}
         <Dialog open={isEditModalOpen} onOpenChange={(open) => {
           setIsEditModalOpen(open);
-          if (open && patient) {
-            // Carregar dados do paciente no formulário quando abrir o modal
-            setEditForm({
-              name: patient.name || "",
-              email: patient.email || "",
-              phone: patient.phone || "",
-              birth_date: patient.birth_date || "",
-              address: patient.address || "",
-              profession: patient.profession || "",
-              emergency_contact: patient.emergency_contact || "",
-              medication: patient.medication || "",
-              notes: patient.notes || "",
-              status: patient.status || "ativo",
-              cpf: patient.cpf || "",
-              gender: patient.gender || "",
-              guardian_name: patient.guardian_name || "",
-              guardian_phone: patient.guardian_phone || "",
-            });
-          }
           if (!open) {
             // Limpar dados de busca quando fechar o modal
             setAddressSearchData({ cep: '', street: '', city: '', state: '' });
@@ -1571,306 +1531,178 @@ export default function PatientProfile() {
                 Atualize as informações básicas do paciente
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); handleEditPatient(); }} className="space-y-4">
-              <Tabs defaultValue="avatar" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="avatar" className="flex items-center gap-2">
-                    <UserCircle className="w-4 h-4" />
-                    Foto
-                  </TabsTrigger>
-                  <TabsTrigger value="personal" className="flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    Dados Pessoais
-                  </TabsTrigger>
-                  <TabsTrigger value="address" className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Endereço
-                  </TabsTrigger>
-                  <TabsTrigger value="professional" className="flex items-center gap-2">
-                    <Building2 className="w-4 h-4" />
-                    Profissional
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Tab - Foto do Paciente */}
-                <TabsContent value="avatar" className="space-y-6 mt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <Avatar className="w-16 h-16">
-                        <AvatarImage 
-                          src={getAvatarUrl(patient?.avatar)} 
-                          className="object-cover"
-                        />
-                        <AvatarFallback>
-                          {patient?.name?.charAt(0)?.toUpperCase() || 'P'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <button
-                        type="button"
-                        onClick={() => setShowAvatarModal(true)}
-                        className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-colors"
-                        title="Redimensionar foto"
-                      >
-                        <Palette className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-medium">Foto do Paciente</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Clique no ícone da paleta para redimensionar a foto
-                      </p>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* Tab - Dados Pessoais */}
-                <TabsContent value="personal" className="space-y-6 mt-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Nome Completo *</Label>
-                      <Input
-                        placeholder="Nome completo"
-                        value={editForm.name}
-                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Email</Label>
-                        <Input
-                          type="email"
-                          placeholder="email@exemplo.com"
-                          value={editForm.email}
-                          onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Telefone</Label>
-                        <Input
-                          placeholder="(11) 99999-9999"
-                          value={editForm.phone}
-                          onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Data de Nascimento</Label>
-                        <Input
-                          type="date"
-                          value={editForm.birth_date}
-                          onChange={(e) => setEditForm({ ...editForm, birth_date: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>CPF</Label>
-                        <Input
-                          placeholder="000.000.000-00"
-                          value={editForm.cpf}
-                          onChange={(e) => setEditForm({ ...editForm, cpf: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Gênero</Label>
-                      <Select
-                        value={editForm.gender}
-                        onValueChange={(value) => setEditForm({ ...editForm, gender: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o gênero" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Masculino">Masculino</SelectItem>
-                          <SelectItem value="Feminino">Feminino</SelectItem>
-                          <SelectItem value="Prefiro não informar">Prefiro não informar</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* Tab - Endereço */}
-                <TabsContent value="address" className="space-y-6 mt-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Buscar Endereço</Label>
-                      <div className="flex gap-2">
-                        <Select value={addressSearchType} onValueChange={(value: 'cep' | 'street') => setAddressSearchType(value)}>
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cep">Por CEP</SelectItem>
-                            <SelectItem value="street">Por Rua</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSearchAddress}
-                          disabled={addressLoading}
-                          className="flex-shrink-0"
-                        >
-                          {addressLoading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <MapPin className="w-4 h-4" />
-                          )}
-                          Buscar
-                        </Button>
-                      </div>
-                    </div>
-
-                    {addressSearchType === 'cep' ? (
-                      <div className="space-y-2">
-                        <Label>CEP</Label>
-                        <Input
-                          placeholder="00000-000"
-                          value={addressSearchData.cep}
-                          onChange={(e) => setAddressSearchData({ ...addressSearchData, cep: formatCEP(e.target.value) })}
-                          maxLength={9}
-                        />
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-2">
-                          <Label>Rua</Label>
-                          <Input
-                            placeholder="Nome da rua"
-                            value={addressSearchData.street}
-                            onChange={(e) => setAddressSearchData({ ...addressSearchData, street: e.target.value })}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Cidade</Label>
-                          <Input
-                            placeholder="Nome da cidade"
-                            value={addressSearchData.city}
-                            onChange={(e) => setAddressSearchData({ ...addressSearchData, city: e.target.value })}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Estado</Label>
-                          <Select value={addressSearchData.state} onValueChange={(value) => setAddressSearchData({ ...addressSearchData, state: value })}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="UF" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="AC">AC</SelectItem>
-                              <SelectItem value="AL">AL</SelectItem>
-                              <SelectItem value="AP">AP</SelectItem>
-                              <SelectItem value="AM">AM</SelectItem>
-                              <SelectItem value="BA">BA</SelectItem>
-                              <SelectItem value="CE">CE</SelectItem>
-                              <SelectItem value="DF">DF</SelectItem>
-                              <SelectItem value="ES">ES</SelectItem>
-                              <SelectItem value="GO">GO</SelectItem>
-                              <SelectItem value="MA">MA</SelectItem>
-                              <SelectItem value="MT">MT</SelectItem>
-                              <SelectItem value="MS">MS</SelectItem>
-                              <SelectItem value="MG">MG</SelectItem>
-                              <SelectItem value="PA">PA</SelectItem>
-                              <SelectItem value="PB">PB</SelectItem>
-                              <SelectItem value="PR">PR</SelectItem>
-                              <SelectItem value="PE">PE</SelectItem>
-                              <SelectItem value="PI">PI</SelectItem>
-                              <SelectItem value="RJ">RJ</SelectItem>
-                              <SelectItem value="RN">RN</SelectItem>
-                              <SelectItem value="RS">RS</SelectItem>
-                              <SelectItem value="RO">RO</SelectItem>
-                              <SelectItem value="RR">RR</SelectItem>
-                              <SelectItem value="SC">SC</SelectItem>
-                              <SelectItem value="SP">SP</SelectItem>
-                              <SelectItem value="SE">SE</SelectItem>
-                              <SelectItem value="TO">TO</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <Label>Endereço Completo</Label>
-                      <Textarea
-                        placeholder="Endereço completo (será preenchido automaticamente ou pode ser editado manualmente)"
-                        value={editForm.address}
-                        onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                        rows={3}
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* Tab - Informações Profissionais */}
-                <TabsContent value="professional" className="space-y-6 mt-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Profissão</Label>
-                      <Input
-                        placeholder="Profissão"
-                        value={editForm.profession}
-                        onChange={(e) => setEditForm({ ...editForm, profession: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Contato de Emergência</Label>
-                      <Input
-                        placeholder="Nome e telefone do contato de emergência"
-                        value={editForm.emergency_contact}
-                        onChange={(e) => setEditForm({ ...editForm, emergency_contact: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Observações Gerais</Label>
-                      <Textarea
-                        placeholder="Observações sobre o paciente"
-                        value={editForm.notes}
-                        onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                        rows={4}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={editForm.status}
-                        onValueChange={(value) => setEditForm({ ...editForm, status: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ativo">Ativo</SelectItem>
-                          <SelectItem value="inativo">Inativo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsEditModalOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  <Save className="h-4 w-4 mr-2" />
-                  Salvar Alterações
-                </Button>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nome Completo *</Label>
+                <Input
+                  placeholder="Nome completo"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                />
               </div>
-            </form>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    placeholder="email@exemplo.com"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Telefone</Label>
+                  <Input
+                    placeholder="(11) 99999-9999"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Data de Nascimento</Label>
+                  <Input
+                    type="date"
+                    value={editForm.birth_date}
+                    onChange={(e) => setEditForm({ ...editForm, birth_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CPF</Label>
+                  <Input
+                    placeholder="000.000.000-00"
+                    value={editForm.cpf}
+                    onChange={(e) => setEditForm({ ...editForm, cpf: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Buscar Endereço</Label>
+                  <div className="flex gap-2">
+                    <Select value={addressSearchType} onValueChange={(value: 'cep' | 'street') => setAddressSearchType(value)}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cep">Por CEP</SelectItem>
+                        <SelectItem value="street">Por Rua</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSearchAddress}
+                      disabled={addressLoading}
+                      className="flex-shrink-0"
+                    >
+                      {addressLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <MapPin className="w-4 h-4" />
+                      )}
+                      Buscar
+                    </Button>
+                  </div>
+                </div>
+
+                {addressSearchType === 'cep' ? (
+                  <div className="space-y-2">
+                    <Label>CEP</Label>
+                    <Input
+                      placeholder="00000-000"
+                      value={addressSearchData.cep}
+                      onChange={(e) => setAddressSearchData({ ...addressSearchData, cep: formatCEP(e.target.value) })}
+                      maxLength={9}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-2">
+                      <Label>Rua</Label>
+                      <Input
+                        placeholder="Nome da rua"
+                        value={addressSearchData.street}
+                        onChange={(e) => setAddressSearchData({ ...addressSearchData, street: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Cidade</Label>
+                      <Input
+                        placeholder="Nome da cidade"
+                        value={addressSearchData.city}
+                        onChange={(e) => setAddressSearchData({ ...addressSearchData, city: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Estado</Label>
+                      <Select value={addressSearchData.state} onValueChange={(value) => setAddressSearchData({ ...addressSearchData, state: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="UF" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AC">AC</SelectItem>
+                          <SelectItem value="AL">AL</SelectItem>
+                          <SelectItem value="AP">AP</SelectItem>
+                          <SelectItem value="AM">AM</SelectItem>
+                          <SelectItem value="BA">BA</SelectItem>
+                          <SelectItem value="CE">CE</SelectItem>
+                          <SelectItem value="DF">DF</SelectItem>
+                          <SelectItem value="ES">ES</SelectItem>
+                          <SelectItem value="GO">GO</SelectItem>
+                          <SelectItem value="MA">MA</SelectItem>
+                          <SelectItem value="MT">MT</SelectItem>
+                          <SelectItem value="MS">MS</SelectItem>
+                          <SelectItem value="MG">MG</SelectItem>
+                          <SelectItem value="PA">PA</SelectItem>
+                          <SelectItem value="PB">PB</SelectItem>
+                          <SelectItem value="PR">PR</SelectItem>
+                          <SelectItem value="PE">PE</SelectItem>
+                          <SelectItem value="PI">PI</SelectItem>
+                          <SelectItem value="RJ">RJ</SelectItem>
+                          <SelectItem value="RN">RN</SelectItem>
+                          <SelectItem value="RS">RS</SelectItem>
+                          <SelectItem value="RO">RO</SelectItem>
+                          <SelectItem value="RR">RR</SelectItem>
+                          <SelectItem value="SC">SC</SelectItem>
+                          <SelectItem value="SP">SP</SelectItem>
+                          <SelectItem value="SE">SE</SelectItem>
+                          <SelectItem value="TO">TO</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Endereço Completo</Label>
+                  <Textarea
+                    placeholder="Endereço completo (será preenchido automaticamente ou pode ser editado manualmente)"
+                    value={editForm.address}
+                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Profissão</Label>
+                <Input
+                  placeholder="Profissão"
+                  value={editForm.profession}
+                  onChange={(e) => setEditForm({ ...editForm, profession: e.target.value })}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditPatient}>
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Alterações
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -2085,16 +1917,6 @@ export default function PatientProfile() {
           onOpenChange={setIsSessionRecordModalOpen}
           onSave={handleSaveSessionRecord}
           loading={actionLoading}
-        />
-
-        {/* Modal de Upload de Avatar */}
-        <PacienteAvatarUploadModal
-          isOpen={showAvatarModal}
-          onClose={() => setShowAvatarModal(false)}
-          onSuccess={handleAvatarSuccess}
-          pacienteId={patient?.id}
-          pacienteNome={patient?.name}
-          currentAvatar={patient?.avatar}
         />
       </div>
     </div>
