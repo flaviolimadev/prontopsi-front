@@ -13,81 +13,30 @@ export default function Arquivos() {
   const [selectedTemplateCategory, setSelectedTemplateCategory] = useState("");
   const { toast } = useToast();
   
-  // Modelos de documentos pré-definidos
-  const documentTemplates = [
-    {
-      id: 1,
-      name: "Modelo de Avaliação Psicológica",
-      category: "Avaliações",
-      description: "Modelo padrão para avaliação psicológica inicial",
-      type: "pdf",
-      size: "256 KB",
-      downloadUrl: "#"
-    },
-    {
-      id: 2,
-      name: "Relatório de Acompanhamento",
-      category: "Relatórios",
-      description: "Template para relatórios de acompanhamento psicológico",
-      type: "pdf",
-      size: "189 KB",
-      downloadUrl: "#"
-    },
-    {
-      id: 3,
-      name: "Termo de Consentimento Livre e Esclarecido",
-      category: "Documentos Legais",
-      description: "TCLE para atendimento psicológico",
-      type: "pdf",
-      size: "98 KB",
-      downloadUrl: "#"
-    },
-    {
-      id: 4,
-      name: "Ficha de Anamnese",
-      category: "Formulários",
-      description: "Formulário para coleta de dados do paciente",
-      type: "pdf",
-      size: "145 KB",
-      downloadUrl: "#"
-    },
-    {
-      id: 5,
-      name: "Plano Terapêutico Individual",
-      category: "Planejamento",
-      description: "Modelo para elaboração de PTI",
-      type: "pdf",
-      size: "203 KB",
-      downloadUrl: "#"
-    },
-    {
-      id: 6,
-      name: "Declaração de Comparecimento",
-      category: "Declarações",
-      description: "Modelo para declaração de comparecimento",
-      type: "pdf",
-      size: "87 KB",
-      downloadUrl: "#"
-    },
-    {
-      id: 7,
-      name: "Relatório Psicológico",
-      category: "Relatórios",
-      description: "Template completo para relatório psicológico",
-      type: "pdf",
-      size: "312 KB",
-      downloadUrl: "#"
-    },
-    {
-      id: 8,
-      name: "Contrato Terapêutico",
-      category: "Documentos Legais",
-      description: "Modelo de contrato para início do atendimento",
-      type: "pdf",
-      size: "156 KB",
-      downloadUrl: "#"
-    }
-  ];
+  // Carregar todos os arquivos da pasta de modelos (@docs)
+  const docsModules = import.meta.glob("@/assets/uploads/docs/*", { eager: true, as: "url" }) as Record<string, string>;
+  const docsSizeMap: Record<string, string> = {
+    "DECLARAÇÃO PSICOLÓGICA.docx": "6.8 KB",
+    "ATESTADO PSICOLÓGICO.docx": "7.0 KB",
+    "RELATÓRIO PSICOLÓGICO.docx": "7.7 KB",
+    "LAUDO PSICOLÓGICO.docx": "8.1 KB",
+    "PARECER PSICOLÓGICO.docx": "7.1 KB",
+  };
+  const docsTemplates = Object.entries(docsModules).map(([path, url], idx) => {
+    const filename = path.split("/").pop() || `Documento_${idx + 1}`;
+    return {
+      id: `doc-${idx + 1}`,
+      name: filename.replace(".docx", ""),
+      category: "Modelos Oficiais",
+      description: filename,
+      type: "docx",
+      size: docsSizeMap[filename] || "-",
+      downloadUrl: url,
+    };
+  });
+  
+  // Listar somente os arquivos reais da pasta @docs
+  const documentTemplates = [...docsTemplates];
 
   const filteredTemplates = documentTemplates.filter(template => {
     const matchesSearch = template.name.toLowerCase().includes(templateSearchTerm.toLowerCase()) ||
@@ -99,10 +48,19 @@ export default function Arquivos() {
   const templateCategories = Array.from(new Set(documentTemplates.map(t => t.category)));
 
   const handleTemplateDownload = (template: any) => {
-    toast({
-      title: "Modelo baixado",
-      description: `Download do modelo "${template.name}" iniciado.`
-    });
+    if (template.downloadUrl && template.downloadUrl !== "#") {
+      const link = document.createElement("a");
+      link.href = template.downloadUrl as string;
+      link.download = template.description || template.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      toast({
+        title: "Modelo baixado",
+        description: `Download do modelo "${template.name}" iniciado.`
+      });
+    }
   };
 
   return (

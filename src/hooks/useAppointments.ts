@@ -174,21 +174,42 @@ export function useAppointments() {
   const { toast } = useToast();
 
   // Converter AgendaSessao para Appointment
-  const convertToAppointment = (agendaSessao: any): Appointment => ({
-    id: agendaSessao.id,
-    user_id: agendaSessao.userId,
-    patient_id: agendaSessao.pacienteId,
-    date: agendaSessao.data,
-    time: agendaSessao.horario,
-    duration: agendaSessao.duracao,
-    type: agendaSessao.tipo,
-    modality: agendaSessao.modalidade,
-    session_type: 'individual', // Assumindo individual como padrão
-    status: agendaSessao.status,
-    notes: agendaSessao.observacoes,
-    created_at: agendaSessao.createdAt,
-    updated_at: agendaSessao.updatedAt
-  });
+  const convertToAppointment = (agendaSessao: any): Appointment => {
+    // Mapear status numérico para string
+    let status: 'agendado' | 'realizado' | 'cancelado' | 'falta';
+    switch (agendaSessao.status) {
+      case 0:
+        status = 'agendado';
+        break;
+      case 1:
+        status = 'agendado'; // em_andamento mapeia para agendado para compatibilidade
+        break;
+      case 2:
+        status = 'realizado';
+        break;
+      case 3:
+        status = 'cancelado';
+        break;
+      default:
+        status = 'agendado';
+    }
+
+    return {
+      id: agendaSessao.id,
+      user_id: agendaSessao.userId,
+      patient_id: agendaSessao.pacienteId,
+      date: agendaSessao.data,
+      time: agendaSessao.horario,
+      duration: agendaSessao.duracao,
+      type: agendaSessao.tipo,
+      modality: agendaSessao.modalidade,
+      session_type: 'individual', // Assumindo individual como padrão
+      status: status,
+      notes: agendaSessao.observacoes,
+      created_at: agendaSessao.createdAt,
+      updated_at: agendaSessao.updatedAt
+    };
+  };
 
   // Converter appointments para formato de exibição
   const appointments = agendaSessoes.map(convertToAppointment);

@@ -451,10 +451,10 @@ export function AppointmentEditModal({ isOpen, onClose, submission, selectedPaci
                         min="1"
                         max="52"
                         value={recurringData.quantity}
-                        onChange={(e) => setRecurringData({
-                          ...recurringData,
-                          quantity: parseInt(e.target.value) || 1
-                        })}
+                                                 onChange={(e) => setRecurringData({
+                           ...recurringData,
+                           quantity: parseFloat(e.target.value) || 1
+                         })}
                         placeholder="Ex: 10"
                         className="h-9 flex-1"
                       />
@@ -560,28 +560,30 @@ export function AppointmentEditModal({ isOpen, onClose, submission, selectedPaci
                         type="text"
                         placeholder="R$ 0,00"
                         value={formData.valorAvulso ? formatCurrencyInput((formData.valorAvulso * 100).toString()) : ''}
-                        onChange={(e) => {
-                          const rawValue = e.target.value.replace(/\D/g, '');
-                          if (rawValue === '') {
-                            setFormData({
-                              ...formData, 
-                              valorAvulso: 0
-                            });
-                          } else {
-                            const numericValue = parseInt(rawValue) / 100;
-                            setFormData({
-                              ...formData, 
-                              valorAvulso: numericValue
-                            });
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const rawValue = e.target.value.replace(/\D/g, '');
-                          if (rawValue !== '') {
-                            const numericValue = parseInt(rawValue) / 100;
-                            e.target.value = formatCurrencyInput((numericValue * 100).toString());
-                          }
-                        }}
+                                                 onChange={(e) => {
+                           const rawValue = e.target.value.replace(/\D/g, '');
+                           if (rawValue === '') {
+                             setFormData({
+                               ...formData, 
+                               valorAvulso: 0
+                             });
+                           } else {
+                             // Corrigido: usar parseFloat em vez de parseInt para evitar perda de dígitos
+                             const numericValue = parseFloat(rawValue) / 100;
+                             setFormData({
+                               ...formData, 
+                               valorAvulso: numericValue
+                             });
+                           }
+                         }}
+                                                 onBlur={(e) => {
+                           const rawValue = e.target.value.replace(/\D/g, '');
+                           if (rawValue !== '') {
+                             // Corrigido: usar parseFloat em vez de parseInt para evitar perda de dígitos
+                             const numericValue = parseFloat(rawValue) / 100;
+                             e.target.value = formatCurrencyInput((numericValue * 100).toString());
+                           }
+                         }}
                         className="h-9 text-sm border-green-300 focus:border-green-500 focus:ring-blue-500"
                       />
                     </div>

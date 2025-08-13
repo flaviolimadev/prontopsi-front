@@ -91,8 +91,8 @@ export function DashboardStats() {
       ];
     }
 
-    // 1. SESSÕES HOJE - Total de agendas para hoje
-    const todayAppointments = appointments.filter(apt => apt.date === today);
+    // 1. SESSÕES HOJE - Total de agendas para hoje (apenas agendadas)
+    const todayAppointments = appointments.filter(apt => apt.date === today && apt.status === "agendado");
     
     // 2. PACIENTES ATIVOS - Já correto
     const activePatients = patients.filter(p => p.status === "ativo").length;

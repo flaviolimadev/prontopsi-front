@@ -85,6 +85,7 @@ import {
   Star,
   MessageSquare,
   Save,
+  ClipboardList,
 } from "lucide-react";
 
 import { usePacientes } from "@/hooks/usePacientes";
@@ -120,6 +121,9 @@ export default function PatientProfile() {
   const [newMedication, setNewMedication] = useState({ nome: '', prescricao: '' });
   const [newEmergencyContact, setNewEmergencyContact] = useState({ nome: '', telefone: '' });
   const [notes, setNotes] = useState('');
+  const [anamnese, setAnamnese] = useState<any>(null);
+  const [anamneseTipo, setAnamneseTipo] = useState<'adulto' | 'menor'>('adulto');
+  const [anamneseRespostas, setAnamneseRespostas] = useState<Record<string, string>>({});
 
   const {
     getPaciente,
@@ -135,6 +139,45 @@ export default function PatientProfile() {
   const { pagamentos } = usePagamentos();
   const { loading: addressLoading, addressData, searchByCEP, searchByStreet, clearAddress } = useAddressSearch();
   const { isFinancialVisible } = useFinancialVisibility();
+
+  const adultoPerguntas: string[] = [
+    'Qual é a sua queixa principal? (O que motivou você a procurar terapia? Há quanto tempo isso acontece? Com que frequência e intensidade esses sintomas ocorrem?)',
+    'De que maneira esse problema tem afetado seus relacionamentos, seu trabalho (ou estudos) e sua rotina?',
+    'Que estratégias, recursos ou tratamentos você já tentou até agora para lidar com esse problema?',
+    'Você já teve algum episódio anterior de sofrimento emocional mais intenso, como depressão, ansiedade ou pensamentos suicidas? Já fez uso de medicação, tratamento ou passou por internação?',
+    'Algum familiar próximo já teve problemas emocionais, psicológicos, uso abusivo de álcool ou outras drogas, doenças importantes ou alguma situação envolvendo tentativa de suicídio?',
+    'Como você se lembrava de ser quando criança? Teve alguma dificuldade ou desafio no seu desenvolvimento nessa época?',
+    'Como foi seu comportamento e desempenho na escola? Você conseguia acompanhar as atividades e se relacionar bem com colegas e professores?',
+    'Você passou por alguma situação difícil, traumática ou marcante na vida? Já teve alguma experiência de abuso?',
+    'Já teve alguma ideia ou vontade de se machucar, como se cortar?',
+    'Como você descreve sua relação com a família atualmente? E como ela costumava ser no passado?',
+    'Quem são as pessoas mais importantes e próximas na sua vida hoje, e com quem você costuma contar quando enfrenta dificuldades?',
+    'Como tem sido sua rotina ultimamente? Como você avalia a qualidade do seu sono? Você tem praticado alguma atividade física?',
+    'Você faz uso de alguma substância, como álcool, maconha ou outras drogas? Se sim, com que frequência e em quais contextos costuma utilizá-las?',
+    'O que você mais gosta de fazer nas horas de lazer? Há alguma atividade que você gostaria de fazer mais atualmente?',
+    'Quais são seus principais objetivos com o tratamento? Tem alguma mudança específica que gostaria de ver na sua vida ou no que está enfrentando?'
+  ];
+
+  const menorPerguntas: string[] = [
+    'Qual o motivo da busca pelo atendimento psicológico?',
+    'Quais são as expectativas de vocês em relação à psicoterapia? O que gostariam que mudasse ou melhorasse com o acompanhamento?',
+    'O que a criança/adolescente sabe sobre estar em acompanhamento psicológico? Alguém contou? Se sim, como foi para ela saber disso?',
+    'A criança/adolescente foi desejada? Me conte um pouco sobre como foi essa gestação. Nasceu com quantos meses? Qual foi a via de parto?',
+    'Como foi o processo da amamentação?',
+    'Como foram os marcos importantes, como o controle da cabeça, sentar, engatinhar, andar e falar? Tudo aconteceu conforme esperado ou houve alguma dificuldade?',
+    'Como está a vida escolar atualmente? Em que série está? Como você observa a relação dele(a) com os colegas e professores?',
+    'Você percebe se há alguma dificuldade em determinadas matérias? Já houve alguma reprovação? A escola já trouxe alguma queixa ou preocupação? Se sim, poderia me contar um pouco sobre o que foi relatado?',
+    'Me conta um pouco sobre como é a rotina dele(a) no dia a dia? Quais atividades ele(a) mais gosta de fazer? Ele(a) passa muito tempo em frente às telas? E com quem costuma ficar durante o dia?',
+    'Ele(a) já consegue tomar banho sozinho(a)? Caso não, quem costuma ajudá-lo(a) nessa tarefa?',
+    'Existe alguma rotina de sono estabelecida? Se sim, ele(a) costuma seguir essa rotina com regularidade?',
+    'Quem mora com a criança/adolescente?',
+    'Essa criança/adolescente já passou por alguma situação difícil, como uma perda significativa, separação, mudança brusca ou algum evento que possa ter sido traumático para ela? Se sim, como ela lidou com isso na época?',
+    'Existe algum problema de saúde atual ou passado que seja importante mencionar? A criança/adolescente faz uso de alguma medicação regularmente?',
+    'Na história da família, há casos de situações emocionais mais delicadas, como depressão, ansiedade, uso problemático de álcool ou outras substâncias, ou algo que tenha exigido acompanhamento psicológico ou psiquiátrico?',
+    'Para adolescente: Você já teve alguma experiência sexual? Foi uma decisão sua? Você costuma usar preservativo nessas ocasiões?',
+    'Para adolescente: Você já namorou? Se sim, seus pais sabem sobre isso? Como foi ou está sendo essa experiência para você',
+    'Você tem alguma doença? Toma algum remédio?'
+  ];
 
   const [editForm, setEditForm] = useState({
     name: "",
@@ -222,6 +265,27 @@ export default function PatientProfile() {
       
       // Carregar observações
       setNotes(pacienteData.observacao_geral || '');
+
+      // Definir tipo de anamnese automaticamente pelo nascimento (adulto x menor)
+      try {
+        if (pacienteData.nascimento) {
+          const birth = new Date(pacienteData.nascimento);
+          if (!Number.isNaN(birth.getTime())) {
+            const years = differenceInYears(new Date(), birth);
+            setAnamneseTipo(years < 18 ? 'menor' : 'adulto');
+          }
+        }
+      } catch {}
+
+      // Carregar anamnese
+      try {
+        const anam = await apiService.getAnamnese(patientId);
+        if (anam) {
+          setAnamnese(anam);
+          // Tipo permanece o detectado automaticamente pela data de nascimento
+          setAnamneseRespostas(anam.respostas || {});
+        }
+      } catch {}
       
       setEditForm({
         name: convertedPatient.name,
@@ -934,7 +998,7 @@ export default function PatientProfile() {
 
         {/* Seção de Abas Principal */}
         <Tabs defaultValue="perfil" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-white/90 dark:bg-gray-800/80 shadow-lg border h-16 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-6 bg-white/90 dark:bg-gray-800/80 shadow-lg border h-16 backdrop-blur-sm">
             <TabsTrigger value="perfil" className="flex items-center gap-2 text-lg h-full data-[state=active]:bg-primary/80 dark:data-[state=active]:bg-primary/60 data-[state=active]:text-primary-foreground">
               <UserCheck className="w-5 h-5" />
               Perfil Completo
@@ -954,6 +1018,10 @@ export default function PatientProfile() {
             <TabsTrigger value="arquivos" className="flex items-center gap-2 text-lg h-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FolderOpen className="w-5 h-5" />
               Arquivos
+            </TabsTrigger>
+            <TabsTrigger value="anamnese" className="flex items-center gap-2 text-lg h-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <ClipboardList className="w-5 h-5" />
+              Anamnese
             </TabsTrigger>
           </TabsList>
 
@@ -1165,6 +1233,62 @@ export default function PatientProfile() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="anamnese" className="space-y-6 mt-10">
+            <Card className="shadow-xl">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
+                <CardTitle className="text-2xl flex items-center gap-3">
+                  <ClipboardList className="w-6 h-6" />
+                  Anamnese
+                </CardTitle>
+                <CardDescription>
+                  Responda às perguntas padrão de anamnese
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div className="flex gap-3 items-center">
+                  <Label>Tipo</Label>
+                  <Badge variant="outline">{anamneseTipo === 'menor' ? 'Menor' : 'Adulto'}</Badge>
+                  <Button className="ml-auto" onClick={async () => {
+                    if (!patientId) return;
+                    await apiService.upsertAnamnese({ pacienteId: patientId, tipo: anamneseTipo, respostas: anamneseRespostas });
+                    toast({ title: 'Sucesso', description: 'Anamnese salva com sucesso.' });
+                  }}>Salvar</Button>
+                </div>
+
+                {/* Perguntas padrão - Adulto */}
+                {anamneseTipo === 'adulto' && (
+                  <div className="space-y-4">
+                    {adultoPerguntas.map((q, idx) => (
+                      <div key={idx} className="space-y-2">
+                        <Label>{q}</Label>
+                        <Textarea
+                          value={anamneseRespostas[idx]?.toString() || ''}
+                          onChange={(e) => setAnamneseRespostas({ ...anamneseRespostas, [idx]: e.target.value })}
+                          rows={3}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Perguntas padrão - Menor */}
+                {anamneseTipo === 'menor' && (
+                  <div className="space-y-4">
+                    {menorPerguntas.map((q, idx) => (
+                      <div key={idx} className="space-y-2">
+                        <Label>{q}</Label>
+                        <Textarea
+                          value={anamneseRespostas[idx]?.toString() || ''}
+                          onChange={(e) => setAnamneseRespostas({ ...anamneseRespostas, [idx]: e.target.value })}
+                          rows={3}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
           {/* Outras abas com conteúdo básico */}
           <TabsContent value="prontuario" className="space-y-6 mt-10">
             <Card className="shadow-xl">

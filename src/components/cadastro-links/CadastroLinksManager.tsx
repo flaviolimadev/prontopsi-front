@@ -206,7 +206,7 @@ export default function CadastroLinksManager() {
                   id="maxUses"
                   type="number"
                   value={formData.maxUses}
-                  onChange={(e) => setFormData({ ...formData, maxUses: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setFormData({ ...formData, maxUses: parseFloat(e.target.value) || 0 })}
                   placeholder="0 = sem limite"
                   min="0"
                 />
@@ -388,7 +388,7 @@ export default function CadastroLinksManager() {
                 id="edit-maxUses"
                 type="number"
                 value={formData.maxUses}
-                onChange={(e) => setFormData({ ...formData, maxUses: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setFormData({ ...formData, maxUses: parseFloat(e.target.value) || 0 })}
                 placeholder="0 = sem limite"
                 min="0"
               />

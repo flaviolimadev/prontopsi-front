@@ -953,7 +953,7 @@ export default function Agenda() {
     }).format(value);
   };
 
-  // Função para formatar valor de entrada (100 -> 1,00)
+  // Função para formatar valor de entrada (100 -> 1,00) - VERSÃO CORRIGIDA
   const formatCurrencyInput = (value: string): string => {
     // Remove tudo que não é número
     const numericValue = value.replace(/\D/g, '');
@@ -961,7 +961,7 @@ export default function Agenda() {
     if (numericValue === '') return '';
     
     // Converte para centavos (100 -> 1.00)
-    const cents = parseInt(numericValue);
+    const cents = parseFloat(numericValue);
     const reais = cents / 100;
     
     // Formata como moeda brasileira
@@ -973,16 +973,47 @@ export default function Agenda() {
     }).format(reais);
   };
 
-  // Função para converter valor formatado de volta para número
-  const parseCurrencyInput = (value: string): number => {
-    // Remove símbolos de moeda e espaços
-    const cleanValue = value.replace(/[R$\s.]/g, '').replace(',', '.');
-    return parseFloat(cleanValue) || 0;
+  // Função para formatar valor avulso igual à página Financeiro
+  const formatValorAvulso = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (!numbers) return '';
+    
+    const amount = parseFloat(numbers) / 100;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
+  const formatCurrencyNumberBRL = (amount: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount || 0);
+  };
+
+  const handleValorAvulsoChange = (value: string) => {
+    const formatted = formatValorAvulso(value);
+    // Extrair o valor numérico para o estado
+    const numericValue = value.replace(/\D/g, '');
+    const amount = numericValue ? parseFloat(numericValue) / 100 : 0;
+    
+    setFormData({
+      ...formData, 
+      valorAvulso: amount
+    });
   };
 
   const handlePagamentoValueChange = (value: string) => {
-    const numericValue = value.replace(/[^\d,]/g, '').replace(',', '.');
-    setPagamentoForm(prev => ({ ...prev, value: parseFloat(numericValue) || 0 }));
+    const formatted = formatValorAvulso(value);
+    // Extrair o valor numérico para o estado
+    const numericValue = value.replace(/\D/g, '');
+    const amount = numericValue ? parseFloat(numericValue) / 100 : 0;
+    
+    setPagamentoForm(prev => ({ ...prev, value: amount }));
   };
 
   const getStatusLabel = (status: number) => {
@@ -1253,7 +1284,7 @@ export default function Agenda() {
                             value={recurringData.quantity}
                             onChange={(e) => setRecurringData({
                               ...recurringData,
-                              quantity: parseInt(e.target.value) || 1
+                              quantity: parseFloat(e.target.value) || 1
                             })}
                             placeholder="Ex: 10"
                             className="h-9 flex-1"
@@ -1359,29 +1390,8 @@ export default function Agenda() {
                             <Input
                               type="text"
                               placeholder="R$ 0,00"
-                              value={formData.valorAvulso ? formatCurrencyInput((formData.valorAvulso * 100).toString()) : ''}
-                              onChange={(e) => {
-                                const rawValue = e.target.value.replace(/\D/g, '');
-                                if (rawValue === '') {
-                                  setFormData({
-                                    ...formData, 
-                                    valorAvulso: 0
-                                  });
-                                } else {
-                                  const numericValue = parseInt(rawValue) / 100;
-                                  setFormData({
-                                    ...formData, 
-                                    valorAvulso: numericValue
-                                  });
-                                }
-                              }}
-                              onBlur={(e) => {
-                                const rawValue = e.target.value.replace(/\D/g, '');
-                                if (rawValue !== '') {
-                                  const numericValue = parseInt(rawValue) / 100;
-                                  e.target.value = formatCurrencyInput((numericValue * 100).toString());
-                                }
-                              }}
+                              value={formData.valorAvulso ? formatValorAvulso(String(Math.round(formData.valorAvulso * 100))) : ''}
+                              onChange={(e) => handleValorAvulsoChange(e.target.value)}
                               className="h-9 text-sm border-green-300 focus:border-green-500 focus:ring-blue-500"
                             />
                           </div>
@@ -2189,7 +2199,7 @@ export default function Agenda() {
               <Label>Valor</Label>
               <Input
                 placeholder="R$ 0,00"
-                value={formatPagamentoValue(pagamentoForm.value)}
+                value={pagamentoForm.value ? formatValorAvulso((pagamentoForm.value * 100).toString()) : ''}
                 onChange={(e) => handlePagamentoValueChange(e.target.value)}
                 disabled={pagamentoForm.pacoteId && pagamentoForm.pacoteId !== 'avulso'}
                 className={pagamentoForm.pacoteId && pagamentoForm.pacoteId !== 'avulso' ? 'bg-muted cursor-not-allowed' : ''}
@@ -2291,7 +2301,7 @@ export default function Agenda() {
               <Label>Valor</Label>
               <Input
                 placeholder="R$ 0,00"
-                value={formatPagamentoValue(pagamentoForm.value)}
+                value={pagamentoForm.value ? formatValorAvulso((pagamentoForm.value * 100).toString()) : ''}
                 onChange={(e) => handlePagamentoValueChange(e.target.value)}
                 disabled={pagamentoForm.pacoteId && pagamentoForm.pacoteId !== 'avulso'}
                 className={pagamentoForm.pacoteId && pagamentoForm.pacoteId !== 'avulso' ? 'bg-muted cursor-not-allowed' : ''}

@@ -629,6 +629,14 @@ class ApiService {
     return this.delete<any>(`/pacientes/${pacienteId}/arquivos/${fileId}`);
   }
 
+  // Anamnese
+  async getAnamnese(pacienteId: string) {
+    return this.get<any>(`/anamneses/${pacienteId}`);
+  }
+  async upsertAnamnese(payload: { pacienteId: string; tipo: 'adulto' | 'menor'; respostas: Record<string, any> }) {
+    return this.post<any>('/anamneses', payload);
+  }
+
   // Links públicos (sem autenticação)
   async getPublicCadastroLink(token: string) {
     return this.get<any>(`/cadastro-links/public/${token}`);

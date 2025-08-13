@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getAvatarUrl } from "@/utils/avatarUtils";
 import { generateProntuarioPDF } from "@/components/prontuario/ProntuarioPDF";
 import { usePatients } from "@/hooks/usePatients";
+import { apiService } from "@/services/api.service";
 import { useAgendaSessoes } from "@/hooks/useAgendaSessoes";
 import { useProntuarios, ProntuarioUpdateData } from "@/hooks/useProntuarios";
 import { useParams, useNavigate } from "react-router-dom";
@@ -107,16 +108,41 @@ export default function Prontuarios() {
     try {
       const prontuario = await getProntuario(patientId);
       console.log('Dados do prontuário carregados:', prontuario);
-      if (prontuario) {
-        // Garantir que evolucao e anexos sejam sempre arrays
-        const prontuarioNormalizado = {
-          ...prontuario,
-          evolucao: prontuario.evolucao || [],
-          anexos: prontuario.anexos || [],
-          avaliacaoDemanda: prontuario.avaliacaoDemanda || "",
-          encaminhamento: prontuario.encaminhamento || ""
-        };
-        console.log('Prontuário normalizado:', prontuarioNormalizado);
+
+      // Normalizar prontuário mesmo se vier nulo/indefinido
+      const prontuarioNormalizado = {
+        avaliacaoDemanda: prontuario?.avaliacaoDemanda || "",
+        encaminhamento: prontuario?.encaminhamento || "",
+        evolucao: prontuario?.evolucao || [],
+        anexos: prontuario?.anexos || [],
+      } as { avaliacaoDemanda: string; encaminhamento: string; evolucao: ProntuarioEntry[]; anexos: Anexo[] };
+      console.log('Prontuário normalizado:', prontuarioNormalizado);
+
+      // Buscar também arquivos enviados na página do paciente e exibir aqui
+      try {
+        const files = await apiService.getPacienteFiles(patientId);
+        const mappedFromPaciente: Anexo[] = (files || []).map((f: any) => {
+          const created = f.createdAt || f.uploadedAt || f.data || f.created_at;
+          const dateStr = created ? new Date(created).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+          return {
+            id: f.id,
+            name: f.nome || f.name || 'arquivo',
+            type: f.tipo || f.type || 'arquivo',
+            size: `${((f.tamanho || f.size || 0) / 1024) | 0} KB`,
+            uploadDate: dateStr,
+          };
+        });
+
+        // Mesclar, evitando duplicados por id
+        const existingIds = new Set(prontuarioNormalizado.anexos.map((a: Anexo) => a.id));
+        const mergedAnexos = [
+          ...prontuarioNormalizado.anexos,
+          ...mappedFromPaciente.filter((a) => a && a.id && !existingIds.has(a.id)),
+        ];
+
+        setProntuarioData({ ...prontuarioNormalizado, anexos: mergedAnexos });
+      } catch (e) {
+        // Fallback: se não conseguir buscar arquivos do paciente, manter apenas os anexos do prontuário
         setProntuarioData(prontuarioNormalizado);
       }
     } catch (error) {
@@ -253,27 +279,11 @@ export default function Prontuarios() {
       console.log('prontuarioData.evolucao:', prontuarioData.evolucao);
       console.log('prontuarioData.anexos:', prontuarioData.anexos);
 
-      // Preparar dados para o PDF
-      const evolucao = prontuarioData.evolucao.map(entry => ({
+      // Preparar dados reais para o PDF (sem placeholders)
+      const evolucao = (prontuarioData.evolucao || []).map(entry => ({
         data: entry.date,
         registro: entry.content
       }));
-
-      // Dados de exemplo para teste se não houver dados reais
-      const dadosExemplo = {
-        avaliacaoDemanda: prontuarioData.avaliacaoDemanda || 'Paciente busca atendimento psicológico devido a sintomas de ansiedade e estresse no trabalho. Objetivos terapêuticos incluem desenvolvimento de estratégias de enfrentamento e melhoria da qualidade de vida. Metodologia baseada na Terapia Cognitivo-Comportamental.',
-        encaminhamento: prontuarioData.encaminhamento || 'Processo terapêutico em andamento. Paciente demonstra boa aderência ao tratamento e progresso significativo.',
-        evolucao: evolucao.length > 0 ? evolucao : [
-          {
-            data: '15/07/2025',
-            registro: 'Primeira sessão realizada. Paciente apresentou-se ansioso e relatou dificuldades no ambiente de trabalho. Foi estabelecido rapport e definidos objetivos terapêuticos iniciais.'
-          },
-          {
-            data: '18/07/2025',
-            registro: 'Segunda sessão: Trabalhadas técnicas de respiração e relaxamento. Paciente demonstrou interesse e comprometimento com as atividades propostas.'
-          }
-        ]
-      };
 
       const dadosPDF = {
         paciente: {
@@ -285,10 +295,10 @@ export default function Prontuarios() {
           telefone: selectedPatient.phone || 'Não informado',
           email: selectedPatient.email || 'Não informado'
         },
-        evolucao: dadosExemplo.evolucao,
-        avaliacaoDemanda: dadosExemplo.avaliacaoDemanda,
-        encaminhamento: dadosExemplo.encaminhamento,
-        anexos: prontuarioData.anexos.length > 0 ? prontuarioData.anexos.map(anexo => `${anexo.name} (${anexo.uploadDate})`).join(', ') : 'Nenhum anexo'
+        evolucao,
+        avaliacaoDemanda: prontuarioData.avaliacaoDemanda || '',
+        encaminhamento: prontuarioData.encaminhamento || '',
+        anexos: (prontuarioData.anexos || []).map(anexo => `${anexo.name} (${anexo.uploadDate})`).join(', ')
       };
 
       console.log('=== DADOS FINAIS PARA PDF ===');

@@ -61,7 +61,7 @@ export const generateProntuarioPDF = async (props: ProntuarioPDFProps) => {
         Avaliação da Demanda e Definição dos Objetivos do Trabalho
       </h2>
       <div style="margin-left: 20px; text-align: justify;">
-        <p>${avaliacaoDemanda || '(Descrever o motivo da busca por atendimento psicológico e os objetivos terapêuticos iniciais, bem como a metodologia a ser adotada no processo terapêutico.)'}</p>
+        <p>${avaliacaoDemanda || ''}</p>
       </div>
     </div>
 
@@ -70,22 +70,12 @@ export const generateProntuarioPDF = async (props: ProntuarioPDFProps) => {
         Evolução
       </h2>
       <div style="margin-left: 20px;">
-        <p style="margin-bottom: 15px;"><em>Registro de sessão. (Registro sucinto e objetivo das intervenções psicológicas, observações relevantes e estratégias utilizadas em cada sessão.)</em></p>
         ${evolucao.length > 0 ? evolucao.map(sessao => `
           <div style="margin-bottom: 20px;">
             <p><strong>Data: ${sessao.data}</strong></p>
             <p style="text-align: justify; margin-left: 20px;">${sessao.registro}</p>
           </div>
-        `).join('') : `
-          <div style="margin-bottom: 20px;">
-            <p><strong>Data: 15/07/2025</strong></p>
-            <p style="text-align: justify; margin-left: 20px;">Nessa primeira sessão…</p>
-          </div>
-          <div style="margin-bottom: 20px;">
-            <p><strong>Data: 18/07/2025</strong></p>
-            <p style="text-align: justify; margin-left: 20px;">(Identificação da Psicóloga com assinatura e carimbo)</p>
-          </div>
-        `}
+        `).join('') : ''}
       </div>
     </div>
 
@@ -94,7 +84,7 @@ export const generateProntuarioPDF = async (props: ProntuarioPDFProps) => {
         Encaminhamento e/ou Encerramento
       </h2>
       <div style="margin-left: 20px; text-align: justify;">
-        <p>${encaminhamento || '(Descrever, se for o caso, os motivos do encaminhamento para outro profissional ou instituição, ou o encerramento do processo terapêutico, incluindo data e justificativa.)'}</p>
+        <p>${encaminhamento || ''}</p>
       </div>
     </div>
 
@@ -103,7 +93,7 @@ export const generateProntuarioPDF = async (props: ProntuarioPDFProps) => {
         Anexos
       </h2>
       <div style="margin-left: 20px; text-align: justify;">
-        <p>${anexos || '(Anexar cópias de relatórios, pareceres, declarações, termos de consentimento ou quaisquer outros documentos emitidos durante o acompanhamento.)'}</p>
+        <p>${anexos || ''}</p>
       </div>
     </div>
   `;

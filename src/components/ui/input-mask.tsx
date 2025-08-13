@@ -23,7 +23,8 @@ const applyMask = (value: string, mask: string): string => {
         .slice(0, 15);
     
     case 'currency':
-      const numberValue = parseInt(cleanValue) / 100;
+      // Corrigido: usar parseFloat em vez de parseInt para evitar perda de dígitos
+      const numberValue = parseFloat(cleanValue) / 100;
       return numberValue.toLocaleString('pt-BR', {
         style: 'currency',
         currency: 'BRL'
