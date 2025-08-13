@@ -12,6 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useProfile } from "@/hooks/useProfile";
 import { FeatureGuard } from "@/components/subscription/FeatureGuard";
+import { SimpleUpgradePrompt } from "@/components/subscription/SimpleUpgradePrompt";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { 
   MessageSquare, 
   Settings, 
@@ -27,6 +29,8 @@ import {
 export default function Relatorios() {
   const { toast } = useToast();
   const { profile, loading, updateWhatsAppConfig, updateReportConfig } = useProfile();
+  const { subscription } = useSubscription();
+  const [showUpgrade, setShowUpgrade] = useState(false);
   
   const [whatsappConfig, setWhatsappConfig] = useState({
     phone: profile?.whatsapp_number || "",
@@ -63,6 +67,10 @@ export default function Relatorios() {
     }
 
     try {
+      if (subscription?.plan_type === 'gratuito') {
+        setShowUpgrade(true);
+        return;
+      }
       await updateWhatsAppConfig(whatsappConfig);
       await updateReportConfig(reportConfig);
       
@@ -90,6 +98,10 @@ export default function Relatorios() {
     }
 
     try {
+      if (subscription?.plan_type === 'gratuito') {
+        setShowUpgrade(true);
+        return;
+      }
       toast({
         title: "Teste enviado com sucesso! ✅",
         description: `AlertaPsi! enviado para ${whatsappConfig.phone}`
@@ -119,6 +131,15 @@ export default function Relatorios() {
     <FeatureGuard 
       feature="reports" 
       featureName="AlertaPsi!"
+      fallback={
+        <div className="space-y-6 p-6">
+          <div className="p-4 border rounded-lg bg-muted/50 flex items-center justify-between">
+            <div className="text-sm">AlertaPsi! está disponível nos planos Pro e Advanced.</div>
+            <Button size="sm" onClick={() => setShowUpgrade(true)}>Fazer upgrade</Button>
+          </div>
+          <SimpleUpgradePrompt isOpen={showUpgrade} onClose={() => setShowUpgrade(false)} title="Recurso exclusivo" message="Este recurso não está disponível no plano Gratuito. Faça upgrade para ativar o AlertaPsi!" />
+        </div>
+      }
     >
       <div className="space-y-6 p-6">
       {/* Header */}
@@ -194,16 +215,24 @@ export default function Relatorios() {
 
             <Separator />
 
-            <div className="flex gap-2">
-              <Button onClick={handleSaveConfig} className="flex-1">
-                <Settings className="w-4 h-4 mr-2" />
-                Salvar Configuração
-              </Button>
-              <Button variant="outline" onClick={handleTestReport}>
-                <Send className="w-4 h-4 mr-2" />
-                Testar
-              </Button>
-            </div>
+            {subscription?.plan_type === 'gratuito' ? (
+              <div className="flex">
+                <Button className="w-full" onClick={() => setShowUpgrade(true)}>
+                  Fazer upgrade para ativar
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button onClick={handleSaveConfig} className="flex-1">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Salvar Configuração
+                </Button>
+                <Button variant="outline" onClick={handleTestReport}>
+                  <Send className="w-4 h-4 mr-2" />
+                  Testar
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -330,6 +359,7 @@ export default function Relatorios() {
         </CardContent>
       </Card>
     </div>
+      <SimpleUpgradePrompt isOpen={showUpgrade} onClose={() => setShowUpgrade(false)} title="Recurso exclusivo" message="Este recurso não está disponível no plano Gratuito. Faça upgrade para ativar o AlertaPsi!" />
     </FeatureGuard>
   );
 }

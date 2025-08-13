@@ -43,7 +43,7 @@ export function UpgradeModal({ isOpen, onClose, currentPlan, blockedFeature }: U
   ];
 
   const handleUpgrade = (planType: string) => {
-    navigate(`/checkout?plan=${planType.toLowerCase()}`);
+    navigate(`/planos`);
     onClose();
   };
 

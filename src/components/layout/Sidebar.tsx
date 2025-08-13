@@ -27,6 +27,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useCadastroLinks } from "@/hooks/useCadastroLinks";
+import { usePacientes } from "@/hooks/usePacientes";
 
 // Importar as logos
 import logoWhite from "@/assets/img/ProntuPsi - Principal Branco sem slogan.png";
@@ -56,6 +57,7 @@ export function Sidebar({ className }: SidebarProps) {
   const { subscription } = useSubscription();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { submissions, fetchSubmissions } = useCadastroLinks();
+  const { total: totalPatients } = usePacientes();
 
   useEffect(() => { fetchSubmissions(); }, [fetchSubmissions]);
   const pendingCount = useMemo(() => (submissions || []).filter(s => s.status === 'pending').length, [submissions]);
@@ -65,7 +67,15 @@ export function Sidebar({ className }: SidebarProps) {
   // Calcular progresso da assinatura
   const getSubscriptionProgress = () => {
     if (!subscription) return 0;
-    
+
+    // Plano gratuito: progresso baseado no limite de pacientes (usados/limite)
+    if (subscription.plan_type === 'gratuito') {
+      const limit = subscription.patient_limit || 0;
+      if (limit <= 0) return 0;
+      const used = totalPatients || 0;
+      return Math.min(100, Math.max(0, (used / limit) * 100));
+    }
+
     if (subscription.status === 'trial' && subscription.trial_days_remaining !== undefined) {
       const totalTrialDays = 7; // Assumindo 7 dias de trial
       const remainingDays = subscription.trial_days_remaining;
@@ -135,7 +145,7 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-2">
+      <nav className="p-2">
         <div className="space-y-2">
           {navigation.map((item) => {
             const Icon = item.icon;
@@ -203,9 +213,18 @@ export function Sidebar({ className }: SidebarProps) {
         </div>
       </nav>
 
-      {/* Card do Plano */}
+      {/* CTA Upgrade + Card do Plano */}
       {!isCollapsed && subscription && (
         <div className="p-3 mx-2 mb-2">
+          {/* CTA Upgrade */}
+          {subscription.plan_type === 'gratuito' && (
+            <Link to="/planos" className="block mb-3">
+              <div className="w-full h-10 px-3 flex items-center gap-2 text-xs font-semibold rounded-lg border border-purple-300/40 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 hover:from-purple-100 hover:to-blue-100 text-purple-700 dark:text-purple-300 cursor-pointer hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary transition-all truncate">
+                <Crown className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Faça upgrade e desbloqueie mais recursos</span>
+              </div>
+            </Link>
+          )}
           <div className={cn(
             "group relative p-4 rounded-xl border transition-all duration-300 hover:scale-[1.02]",
             "shadow-sm hover:shadow-md",

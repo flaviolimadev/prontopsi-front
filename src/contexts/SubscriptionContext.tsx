@@ -4,19 +4,20 @@ import { useToast } from '@/hooks/use-toast';
 export interface Subscription {
   id: string;
   user_id: string;
-  plan_type: 'essencial' | 'profissional' | 'premium';
+  plan_type: 'gratuito' | 'pro' | 'advanced';
   status: 'active' | 'canceled' | 'past_due' | 'trial';
-  patient_limit: number;
+  patient_limit: number | null;
   current_period_start: string;
   current_period_end: string;
   trial_end_date?: string;
   trial_days_remaining?: number;
   features: {
-    patients: number;
+    patients: number | null;
     files: boolean;
     reports: boolean;
-    whatsapp: boolean;
-    priority_support: boolean;
+    whatsapp_view: boolean; // visualizar/receber relatório
+    whatsapp_scheduling: boolean; // agendamento via WhatsApp
+    ai_assistant: boolean; // agente IA
   };
 }
 
@@ -25,59 +26,62 @@ interface SubscriptionContextType {
   loading: boolean;
   isFeatureBlocked: (feature: string) => boolean;
   isOnTrial: () => boolean;
-  startTrial: (planType: 'profissional' | 'premium') => Promise<boolean>;
-  upgradePlan: (planType: 'essencial' | 'profissional' | 'premium') => Promise<boolean>;
+  startTrial: (planType: 'pro' | 'advanced') => Promise<boolean>;
+  upgradePlan: (planType: 'gratuito' | 'pro' | 'advanced') => Promise<boolean>;
   cancelSubscription: () => Promise<boolean>;
+  canAddPatient: (currentCount: number) => boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
-// Dados mockados
-const mockSubscription: Subscription = {
+// Plano gratuito padrão (após cadastro)
+const freeSubscription: Subscription = {
   id: 'sub-1',
   user_id: 'user-1',
-  plan_type: 'profissional',
-  status: 'trial',
-  patient_limit: 50,
-  current_period_start: '2024-01-01T00:00:00Z',
-  current_period_end: '2024-02-01T00:00:00Z',
-  trial_end_date: '2024-01-08T00:00:00Z',
-  trial_days_remaining: 3,
+  plan_type: 'gratuito',
+  status: 'active',
+  patient_limit: 5,
+  current_period_start: new Date().toISOString(),
+  current_period_end: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString(); })(),
   features: {
-    patients: 50,
+    patients: 5,
     files: true,
-    reports: true,
-    whatsapp: true,
-    priority_support: false
+    reports: false,
+    whatsapp_view: false,
+    whatsapp_scheduling: false,
+    ai_assistant: false
   }
 };
 
-const planFeatures = {
-  essencial: {
-    patients: 10,
-    files: false,
+const planFeatures: Record<'gratuito' | 'pro' | 'advanced', any> = {
+  gratuito: {
+    patients: 5,
+    files: true,
     reports: false,
-    whatsapp: false,
-    priority_support: false
+    whatsapp_view: false,
+    whatsapp_scheduling: false,
+    ai_assistant: false,
   },
-  profissional: {
-    patients: 50,
+  pro: {
+    patients: null, // ilimitado
     files: true,
     reports: true,
-    whatsapp: true,
-    priority_support: false
+    whatsapp_view: true,
+    whatsapp_scheduling: false, // bloqueado no Pro
+    ai_assistant: false, // bloqueado no Pro
   },
-  premium: {
-    patients: 200,
+  advanced: {
+    patients: null,
     files: true,
     reports: true,
-    whatsapp: true,
-    priority_support: true
-  }
+    whatsapp_view: true,
+    whatsapp_scheduling: true,
+    ai_assistant: true,
+  },
 };
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
-  const [subscription, setSubscription] = useState<Subscription | null>(mockSubscription);
+  const [subscription, setSubscription] = useState<Subscription | null>(freeSubscription);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -88,7 +92,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       // Simular delay de rede
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      setSubscription(mockSubscription);
+      setSubscription(freeSubscription);
     } catch (error) {
       console.error('Erro ao buscar assinatura:', error);
     } finally {
@@ -104,10 +108,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         return !subscription.features.files;
       case 'reports':
         return !subscription.features.reports;
-      case 'whatsapp':
-        return !subscription.features.whatsapp;
-      case 'priority_support':
-        return !subscription.features.priority_support;
+      case 'whatsapp_view':
+        return !subscription.features.whatsapp_view;
+      case 'whatsapp_scheduling':
+        return !subscription.features.whatsapp_scheduling;
+      case 'ai_assistant':
+        return !subscription.features.ai_assistant;
       default:
         return false;
     }
@@ -118,7 +124,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     return subscription.status === 'trial' && (subscription.trial_days_remaining || 0) > 0;
   };
 
-  const startTrial = async (planType: 'profissional' | 'premium'): Promise<boolean> => {
+  const startTrial = async (planType: 'pro' | 'advanced'): Promise<boolean> => {
     try {
       setLoading(true);
       
@@ -133,7 +139,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         user_id: 'user-1',
         plan_type: planType,
         status: 'trial',
-        patient_limit: planFeatures[planType].patients,
+        patient_limit: planFeatures[planType].patients === null ? null : planFeatures[planType].patients,
         current_period_start: new Date().toISOString(),
         current_period_end: trialEndDate.toISOString(),
         trial_end_date: trialEndDate.toISOString(),
@@ -162,7 +168,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const upgradePlan = async (planType: 'essencial' | 'profissional' | 'premium'): Promise<boolean> => {
+  const upgradePlan = async (planType: 'gratuito' | 'pro' | 'advanced'): Promise<boolean> => {
     try {
       setLoading(true);
       
@@ -173,9 +179,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         ...subscription!,
         plan_type: planType,
         status: 'active',
-        patient_limit: planFeatures[planType].patients,
+        patient_limit: planFeatures[planType].patients === null ? null : planFeatures[planType].patients,
         features: planFeatures[planType],
-        trial_days_remaining: 0
+        trial_days_remaining: 0,
+        current_period_start: new Date().toISOString(),
+        current_period_end: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString(); })(),
       };
       
       setSubscription(updatedSubscription);
@@ -197,6 +205,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const canAddPatient = (currentCount: number): boolean => {
+    if (!subscription) return false;
+    if (subscription.patient_limit === null) return true; // ilimitado
+    return currentCount < subscription.patient_limit;
   };
 
   const cancelSubscription = async (): Promise<boolean> => {
@@ -245,7 +259,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     isOnTrial,
     startTrial,
     upgradePlan,
-    cancelSubscription
+    cancelSubscription,
+    canAddPatient,
   };
 
   return (

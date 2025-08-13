@@ -15,11 +15,16 @@ import { useDataSync } from "@/hooks/useDataSync";
 import { SyncIndicator } from "@/components/ui/sync-indicator";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const { syncAllData, syncStatus, lastSync } = useDataSync();
+  const { subscription } = useSubscription();
+  const navigate = useNavigate();
   
   // Função para obter saudação e ícone baseado no horário
   const getGreetingWithIcon = () => {
@@ -50,6 +55,18 @@ export default function Dashboard() {
     <div className="space-y-4 md:space-y-6 w-full overflow-x-hidden p-4 md:p-6 min-h-screen">
       {/* Trial Banner */}
       <TrialBanner />
+
+      {/* CTA Upgrade no topo do Dashboard */}
+      {subscription?.plan_type === 'gratuito' && (
+        <div className="p-4 border rounded-lg bg-muted/50 flex items-center justify-between">
+          <div className="text-sm">
+            <span className="font-medium">Aproveite mais recursos:</span> teste o Pro ou o Advanced por 7 dias, sem compromisso.
+          </div>
+          <Button size="sm" onClick={() => navigate('/planos')}>
+            Ver planos
+          </Button>
+        </div>
+      )}
 
       {/* Welcome Header */}
       <div className="mb-4 md:mb-8">

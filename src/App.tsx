@@ -33,6 +33,7 @@ import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
 import Checkout from "./pages/Checkout";
 import PlanSelection from "./pages/PlanSelection";
+import Planos from "./pages/Planos";
 
 // Páginas de erro
 import NotFound from "./pages/NotFound";
@@ -197,6 +198,16 @@ function App() {
                       <ProtectedRoute>
                         <AppLayout>
                           <Checkout />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/planos"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <Planos />
                         </AppLayout>
                       </ProtectedRoute>
                     }

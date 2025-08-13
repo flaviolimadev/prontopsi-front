@@ -14,10 +14,13 @@ import { usePacientes } from '@/hooks/usePacientes';
 import { PacientesTable } from '@/components/pacientes/PacientesTable';
 import { PacienteForm } from '@/components/pacientes/PacienteForm';
 import { RegistroRapidoForm } from '@/components/pacientes/RegistroRapidoForm';
+import { SimpleUpgradePrompt } from '@/components/subscription/SimpleUpgradePrompt';
 import CadastroLinksManager from '@/components/cadastro-links/CadastroLinksManager';
 import { SubmissionsManager } from '@/components/cadastro-links/SubmissionsManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCadastroLinks } from '@/hooks/useCadastroLinks';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Pacientes() {
   const {
@@ -36,6 +39,9 @@ export default function Pacientes() {
     applyFilters,
     changePage,
   } = usePacientes();
+  const { subscription, canAddPatient } = useSubscription();
+  const { toast } = useToast();
+  const [showUpgradeModal, setShowUpgradeModal] = React.useState(false);
 
   const { submissions, fetchSubmissions } = useCadastroLinks();
   React.useEffect(() => { 
@@ -92,6 +98,17 @@ export default function Pacientes() {
   }, []);
 
   const handleCreatePaciente = async (data: any) => {
+    const limit = subscription?.patient_limit ?? null;
+    const isFree = subscription?.plan_type === 'gratuito';
+    // Bloquear inclusão acima do limite no plano gratuito
+    if (isFree && limit !== null && total >= limit) {
+      toast({
+        title: 'Limite atingido',
+        description: 'No plano Gratuito é possível cadastrar até 5 pacientes. Faça upgrade para adicionar mais.',
+        variant: 'destructive',
+      });
+      return;
+    }
     await createPaciente(data);
   };
 
@@ -125,9 +142,14 @@ export default function Pacientes() {
     changePage(newPage);
   };
 
-  // Calcular estatísticas
-  const activePacientes = pacientes.filter(p => p.status === 1).length;
-  const inactivePacientes = pacientes.filter(p => p.status === 0).length;
+  // Restringir acesso aos primeiros 5 no plano gratuito
+  const limit = subscription?.patient_limit ?? null;
+  const isFree = subscription?.plan_type === 'gratuito';
+  const displayedPacientes = isFree && limit !== null ? pacientes.slice(0, limit) : pacientes;
+
+  // Calcular estatísticas com base no que o usuário pode acessar
+  const activePacientes = displayedPacientes.filter(p => p.status === 1).length;
+  const inactivePacientes = displayedPacientes.filter(p => p.status === 0).length;
 
   return (
     <div className="space-y-6">
@@ -164,17 +186,23 @@ export default function Pacientes() {
                 Visualize e gerencie todos os seus pacientes
               </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <PacienteForm
-                onSubmit={handleCreatePaciente}
-                loading={loading}
-                mode="create"
-              />
-              <RegistroRapidoForm
-                onSubmit={handleCreatePaciente}
-                loading={loading}
-              />
-            </div>
+            {!(isFree && limit !== null && total >= limit) ? (
+              <div className="flex items-center space-x-2">
+                <PacienteForm
+                  onSubmit={handleCreatePaciente}
+                  loading={loading}
+                  mode="create"
+                />
+                <RegistroRapidoForm
+                  onSubmit={handleCreatePaciente}
+                  loading={loading}
+                />
+              </div>
+            ) : (
+              <Button variant="default" onClick={() => setShowUpgradeModal(true)}>
+                Fazer upgrade para adicionar mais pacientes
+              </Button>
+            )}
           </div>
 
       {/* Estatísticas */}
@@ -236,11 +264,11 @@ export default function Pacientes() {
 
       {/* Tabela de Pacientes */}
       <PacientesTable
-        pacientes={pacientes}
+        pacientes={displayedPacientes}
         loading={loading}
-        total={total}
+        total={displayedPacientes.length}
         page={page}
-        totalPages={totalPages}
+        totalPages={1}
         onSearch={handleSearch}
         onStatusFilter={handleStatusFilter}
         onPageChange={handlePageChange}
@@ -250,6 +278,18 @@ export default function Pacientes() {
         onDeactivate={handleDeactivatePaciente}
         onReactivate={handleReactivatePaciente}
       />
+
+      {/* CTA para upgrade quando no limite */}
+      {isFree && limit !== null && total >= limit && (
+        <Card className="border-purple-200 bg-purple-50 dark:bg-purple-900/20">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="text-sm">
+              Você atingiu o limite de {limit} pacientes do plano Gratuito. Faça upgrade para cadastrar ilimitado.
+            </div>
+            <Button variant="default" onClick={() => setShowUpgradeModal(true)}>Fazer upgrade</Button>
+          </CardContent>
+        </Card>
+      )}
 
           {/* Mensagem de erro */}
           {error && (
@@ -272,6 +312,12 @@ export default function Pacientes() {
           <SubmissionsManager />
         </TabsContent>
       </Tabs>
+      <SimpleUpgradePrompt
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Limite atingido"
+        message={`Você atingiu o limite de ${limit ?? 5} pacientes do plano Gratuito. Faça upgrade para cadastrar mais.`}
+      />
     </div>
   );
 }
