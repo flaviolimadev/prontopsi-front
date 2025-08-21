@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -190,7 +190,8 @@ export default function Financeiro() {
     value: '',
     descricao: '',
     type: null,
-    txid: ''
+    txid: '',
+    fiscalIssued: false
   });
 
   const [newPaymentForm, setNewPaymentForm] = useState({
@@ -201,7 +202,58 @@ export default function Financeiro() {
     date: formatDateToYYYYMMDD(new Date())
   });
 
+  // Controle local: nota fiscal/recibo emitido por pagamento
+  const [fiscalIssuedMap, setFiscalIssuedMap] = useState<Record<string, { recibo: boolean; notaFiscal: boolean }>>({});
 
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pagamentos_fiscal_issued') || '{}');
+      // Garante chaves existentes
+      const map: Record<string, { recibo: boolean; notaFiscal: boolean }> = { ...stored };
+      (pagamentos || []).forEach(p => {
+        if (map[p.id] === undefined) map[p.id] = { recibo: false, notaFiscal: false };
+        // Migração de formato antigo (boolean) para novo (objeto)
+        if (typeof map[p.id] === 'boolean') {
+          map[p.id] = { recibo: map[p.id] as boolean, notaFiscal: false };
+        }
+      });
+      setFiscalIssuedMap(map);
+      localStorage.setItem('pagamentos_fiscal_issued', JSON.stringify(map));
+    } catch {
+      setFiscalIssuedMap({});
+    }
+  }, [pagamentos]);
+
+  const isReciboIssued = (id: string) => !!fiscalIssuedMap[id]?.recibo;
+  const isNotaFiscalIssued = (id: string) => !!fiscalIssuedMap[id]?.notaFiscal;
+
+  const handleToggleRecibo = (id: string, value: boolean) => {
+    setFiscalIssuedMap(prev => {
+      const next = { 
+        ...prev, 
+        [id]: { 
+          ...(prev[id] || { recibo: false, notaFiscal: false }), 
+          recibo: value 
+        } 
+      };
+      try { localStorage.setItem('pagamentos_fiscal_issued', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const handleToggleNotaFiscal = (id: string, value: boolean) => {
+    setFiscalIssuedMap(prev => {
+      const next = { 
+        ...prev, 
+        [id]: { 
+          ...(prev[id] || { recibo: false, notaFiscal: false }), 
+          notaFiscal: value 
+        } 
+      };
+      try { localStorage.setItem('pagamentos_fiscal_issued', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   const [quickPaymentForm, setQuickPaymentForm] = useState({
     patient: "",
@@ -484,7 +536,15 @@ export default function Financeiro() {
       });
 
       // Persistir controle local (se houver ID retornado)
-
+      try {
+        const mapKey = 'pagamentos_fiscal_issued';
+        const currentMap = JSON.parse(localStorage.getItem(mapKey) || '{}');
+        const createdId = (created && (created.id || created?.data?.id)) || null;
+        if (createdId) {
+          currentMap[createdId] = !!pagamentoForm.fiscalIssued;
+          localStorage.setItem(mapKey, JSON.stringify(currentMap));
+        }
+      } catch {}
 
       setIsPaymentModalOpen(false);
       setPagamentoForm({
@@ -495,7 +555,8 @@ export default function Financeiro() {
         value: '',
         descricao: '',
         type: null,
-        txid: ''
+        txid: '',
+        fiscalIssued: false
       });
     } catch (error) {
       // Erro já tratado no hook
@@ -504,6 +565,12 @@ export default function Financeiro() {
 
   const handleEditPagamento = (pagamento: any) => {
     setSelectedPagamento(pagamento);
+    // Ler controle local de fiscalIssued
+    let fiscalIssuedLocal = false;
+    try {
+      const map = JSON.parse(localStorage.getItem('pagamentos_fiscal_issued') || '{}');
+      fiscalIssuedLocal = !!map[pagamento.id];
+    } catch {}
     setPagamentoForm({
       pacienteId: pagamento.pacienteId,
       pacoteId: pagamento.pacoteId || '',
@@ -516,7 +583,8 @@ export default function Financeiro() {
       }).format(pagamento.value),
       descricao: pagamento.descricao || '',
       type: pagamento.type || null,
-      txid: pagamento.txid || ''
+      txid: pagamento.txid || '',
+      fiscalIssued: fiscalIssuedLocal
     });
     setIsEditPagamentoModalOpen(true);
   };
@@ -543,7 +611,15 @@ export default function Financeiro() {
         txid: pagamentoForm.txid || undefined
       });
 
-
+      // Persistir controle local do fiscalIssued
+      try {
+        const mapKey = 'pagamentos_fiscal_issued';
+        const currentMap = JSON.parse(localStorage.getItem(mapKey) || '{}');
+        if (selectedPagamento?.id) {
+          currentMap[selectedPagamento.id] = !!pagamentoForm.fiscalIssued;
+          localStorage.setItem(mapKey, JSON.stringify(currentMap));
+        }
+      } catch {}
 
       setIsEditPagamentoModalOpen(false);
       setSelectedPagamento(null);
@@ -555,7 +631,8 @@ export default function Financeiro() {
         value: '',
         descricao: '',
         type: null,
-        txid: ''
+        txid: '',
+        fiscalIssued: false
       });
     } catch (error) {
       // Erro já tratado no hook
@@ -617,7 +694,6 @@ export default function Financeiro() {
       case 2: return 'Cartão';
       case 3: return 'Boleto';
       case 4: return 'Dinheiro';
-      case 5: return 'Convênio';
       default: return 'Não informado';
     }
   };
@@ -1760,7 +1836,7 @@ export default function Financeiro() {
                       setPagamentoForm({
                         ...pagamentoForm, 
                         pacoteId: newPacoteId,
-                        value: selectedPacote ? selectedPacote.value : ''
+                        value: selectedPacote ? Number(selectedPacote.value) : pagamentoForm.value
                       });
                     }}>
                       <SelectTrigger>
@@ -1776,13 +1852,23 @@ export default function Financeiro() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Data de Pagamento *</Label>
-                    <Input
-                      type="date"
-                      value={pagamentoForm.data}
-                      onChange={(e) => setPagamentoForm({...pagamentoForm, data: e.target.value})}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Data *</Label>
+                      <Input
+                        type="date"
+                        value={pagamentoForm.data}
+                        onChange={(e) => setPagamentoForm({...pagamentoForm, data: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Vencimento *</Label>
+                      <Input
+                        type="date"
+                        value={pagamentoForm.vencimento}
+                        onChange={(e) => setPagamentoForm({...pagamentoForm, vencimento: e.target.value})}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Valor *</Label>
@@ -1802,21 +1888,38 @@ export default function Financeiro() {
                       </p>
                     )}
                   </div>
-
                   <div className="space-y-2">
-                    <Label>Forma de Pagamento</Label>
-                    <Select value={pagamentoForm.type?.toString() || ''} onValueChange={(value) => setPagamentoForm({...pagamentoForm, type: value ? parseInt(value) : null})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecionar forma de pagamento" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">PIX</SelectItem>
-                        <SelectItem value="2">Cartão</SelectItem>
-                        <SelectItem value="3">Boleto</SelectItem>
-                        <SelectItem value="4">Dinheiro</SelectItem>
-                        <SelectItem value="5">Convênio</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label>Descrição</Label>
+                    <Textarea
+                      placeholder="Descrição do pagamento..."
+                      value={pagamentoForm.descricao}
+                      onChange={(e) => setPagamentoForm({...pagamentoForm, descricao: e.target.value})}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Tipo de Pagamento</Label>
+                      <Select value={pagamentoForm.type?.toString() || ''} onValueChange={(value) => setPagamentoForm({...pagamentoForm, type: value ? parseInt(value) : null})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">PIX</SelectItem>
+                          <SelectItem value="2">Cartão</SelectItem>
+                          <SelectItem value="3">Boleto</SelectItem>
+                          <SelectItem value="4">Dinheiro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>TXID (Opcional)</Label>
+                      <Input
+                        placeholder="ID da transação"
+                        value={pagamentoForm.txid}
+                        onChange={(e) => setPagamentoForm({...pagamentoForm, txid: e.target.value})}
+                      />
+                    </div>
                   </div>
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => setIsPaymentModalOpen(false)}>
@@ -1917,6 +2020,21 @@ export default function Financeiro() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-3 items-center">
+                        {/* Controle local: Nota fiscal/recibo emitido */}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>Recibo?</span>
+                          <Switch
+                            checked={isReciboIssued(pagamento.id)}
+                            onCheckedChange={(checked) => handleToggleRecibo(pagamento.id, checked)}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>N.Fiscal?</span>
+                          <Switch
+                            checked={isNotaFiscalIssued(pagamento.id)}
+                            onCheckedChange={(checked) => handleToggleNotaFiscal(pagamento.id, checked)}
+                          />
+                        </div>
                         {pagamento.status === 0 && (
                           <Button 
                             size="sm" 
@@ -2115,7 +2233,20 @@ export default function Financeiro() {
                 rows={2}
               />
             </div>
-
+            <div className="grid grid-cols-2 gap-4 items-center">
+              <div className="space-y-1">
+                <Label>Nota fiscal ou recibo emitido?</Label>
+                <p className="text-xs text-muted-foreground">Somente controle do psicólogo</p>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <span className="text-sm">Não</span>
+                <Switch
+                  checked={pagamentoForm.fiscalIssued}
+                  onCheckedChange={(checked) => setPagamentoForm({...pagamentoForm, fiscalIssued: checked})}
+                />
+                <span className="text-sm">Sim</span>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Tipo de Pagamento</Label>

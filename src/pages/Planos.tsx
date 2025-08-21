@@ -1,15 +1,24 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, Clock, X } from 'lucide-react';
+import { Check, Clock, X, Zap, Shield, Sparkles } from 'lucide-react';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function Planos() {
   const navigate = useNavigate();
-  const { subscription, startTrial, upgradePlan } = useSubscription();
+  const { startTrial, upgradePlan } = useSubscription();
   const [selected, setSelected] = useState<'pro' | 'advanced'>('pro');
+  const [trialLockedPlan, setTrialLockedPlan] = useState<null | 'pro' | 'advanced'>(null);
+
+  useEffect(() => {
+    const locked = localStorage.getItem('trial_locked_plan') as 'pro' | 'advanced' | null;
+    if (locked) {
+      setTrialLockedPlan(locked);
+      setSelected(locked);
+    }
+  }, []);
 
   // Matriz de recursos para renderização e destaque do que não está incluído
   const featureDefs = [
@@ -43,13 +52,19 @@ export default function Planos() {
   ];
 
   const handleStartTrial = async (plan: 'pro' | 'advanced') => {
+    if (trialLockedPlan) return; // já está em teste, não permite novo
     const ok = await startTrial(plan);
-    if (ok) navigate('/dashboard');
+    if (ok) {
+      localStorage.setItem('trial_locked_plan', plan);
+      setTrialLockedPlan(plan);
+      navigate('/dashboard');
+    }
   };
 
   const handleSubscribe = async (plan: 'pro' | 'advanced') => {
-    const ok = await upgradePlan(plan);
-    if (ok) navigate('/dashboard');
+    // Redireciona ao checkout com plano e valor predefinidos
+    const priceMap = { pro: 5900, advanced: 9700 } as const; // em centavos
+    navigate(`/checkout?plan=${plan}&amount=${priceMap[plan]}`);
   };
 
   const handleDowngradeFree = async () => {
@@ -58,42 +73,54 @@ export default function Planos() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Hero/CTA */}
-      <div className="relative overflow-hidden rounded-2xl p-8 md:p-10 bg-gradient-to-r from-primary/15 via-primary/10 to-primary/15 border">
-        <div className="max-w-3xl">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Evolua seu atendimento com um plano profissional</h1>
-          <p className="text-muted-foreground mb-4">Compare recursos, faça um teste de 7 dias sem compromisso ou assine agora e desbloqueie todo o potencial do sistema.</p>
-          <div className="flex gap-2">
-            <Button onClick={() => handleStartTrial(selected)} variant="outline">
-              <Clock className="h-4 w-4 mr-2" /> Testar 7 dias
+    <div className="container mx-auto p-6 space-y-8">
+      {/* Hero minimalista */}
+      <div className="relative overflow-hidden rounded-2xl p-8 md:p-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white border shadow-lg">
+        <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
+        <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="relative z-10 max-w-3xl">
+          <div className="flex items-center gap-2 text-primary mb-3">
+            <Sparkles className="h-4 w-4" />
+            <span className="text-xs tracking-widest uppercase">Planos ProntuPsi</span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">Escolha o plano ideal para sua clínica</h1>
+          <p className="text-slate-300 mb-5">Recursos profissionais, segurança e performance para você focar nos pacientes.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => handleStartTrial(selected)} variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/20">
+              <Clock className="h-4 w-4 mr-2" /> Testar 7 dias grátis
             </Button>
-            <Button onClick={() => handleSubscribe(selected)}>
-              Assinar {selected === 'pro' ? 'Pro' : 'Advanced'}
+            <Button onClick={() => handleSubscribe(selected)} className="bg-primary text-primary-foreground">
+              <Zap className="h-4 w-4 mr-2" /> Assinar {selected === 'pro' ? 'Pro' : 'Advanced'}
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Cards */}
+      {/* Cards dos planos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {plans.map((plan) => (
           <Card
             key={plan.key}
-            className={`transition-all ${selected === plan.key ? 'border-primary shadow-lg' : ''} ${plan.key === 'advanced' ? 'ring-1 ring-primary/50' : ''}`}
+            className={`transition-all duration-300 hover:shadow-xl ${selected === plan.key ? 'border-primary shadow-lg' : 'border-slate-200 dark:border-slate-800'} ${plan.key === 'advanced' ? 'ring-1 ring-primary/40' : ''}`}
+            onMouseEnter={() => {
+              if (!trialLockedPlan || trialLockedPlan === plan.key) setSelected(plan.key);
+            }}
           >
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>{plan.name}</span>
+                <div className="flex items-center gap-2">
+                  <Shield className={`h-4 w-4 ${plan.key === 'advanced' ? 'text-primary' : 'text-slate-500'}`} />
+                  <span className="text-lg font-semibold">{plan.name}</span>
+                </div>
                 <div className="flex items-center gap-2">
                   {plan.key === 'advanced' && (
                     <Badge className="bg-primary text-primary-foreground">Mais completo</Badge>
                   )}
-                  <Badge>{plan.price} {plan.period}</Badge>
+                  <Badge variant="secondary">{plan.price} {plan.period}</Badge>
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
               <ul className="space-y-2">
                 {featureDefs.map((feat) => {
                   const included = planMatrix[plan.key][feat.key];
@@ -107,77 +134,20 @@ export default function Planos() {
                 })}
               </ul>
 
-              <div className="flex gap-2 pt-2">
-                <Button variant={selected === plan.key ? 'default' : 'outline'} className="flex-1" onClick={() => setSelected(plan.key)}>
-                  Selecionar
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleStartTrial(plan.key)}
+                  disabled={!!trialLockedPlan}
+                >
+                  <Clock className="h-4 w-4 mr-2" />Teste
                 </Button>
-                <Button variant="outline" className="flex-1" onClick={() => handleStartTrial(plan.key)}>
-                  <Clock className="h-4 w-4 mr-2" /> Teste 7 dias
-                </Button>
-                <Button className="flex-1" onClick={() => handleSubscribe(plan.key)}>Assinar</Button>
+                <Button onClick={() => handleSubscribe(plan.key)}>Assinar</Button>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
-
-      {/* Ação: voltar para o plano gratuito */}
-      <div className="text-center">
-        <Button variant="outline" onClick={handleDowngradeFree}>
-          Voltar para plano Gratuito
-        </Button>
-      </div>
-
-      {/* Comparativo com o plano atual */}
-      {subscription && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Comparativo com seu plano atual</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div className="p-4 rounded-lg border">
-              <div className="font-semibold mb-2">Seu plano atual</div>
-              <div className="mb-3"><Badge variant="secondary" className="capitalize">{subscription.plan_type}</Badge></div>
-              <ul className="space-y-1">
-                {featureDefs.map((f) => {
-                  const has = (subscription.features as any)[f.key];
-                  const Icon = has ? Check : X;
-                  return (
-                    <li key={`cur-${f.key}`} className="flex items-center gap-2">
-                      <Icon className={`h-4 w-4 ${has ? 'text-green-500' : 'text-red-500'}`} />
-                      <span>{f.label}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-            {(['pro','advanced'] as const).map((p) => (
-              <div key={`cmp-${p}`} className="p-4 rounded-lg border">
-                <div className="font-semibold mb-2">Plano {p === 'pro' ? 'Pro' : 'Advanced'}</div>
-                <div className="mb-3"><Badge>{p === 'pro' ? 'R$ 59/mês' : 'R$ 97/mês'}</Badge></div>
-                <ul className="space-y-1">
-                  {featureDefs.map((f) => {
-                    const has = planMatrix[p][f.key];
-                    const Icon = has ? Check : X;
-                    return (
-                      <li key={`plan-${p}-${f.key}`} className="flex items-center gap-2">
-                        <Icon className={`h-4 w-4 ${has ? 'text-green-500' : 'text-red-500'}`} />
-                        <span>{f.label}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <div className="flex gap-2 pt-3">
-                  <Button variant="outline" onClick={() => handleStartTrial(p)}>
-                    <Clock className="h-4 w-4 mr-2" /> Testar 7 dias
-                  </Button>
-                  <Button onClick={() => handleSubscribe(p)}>Assinar</Button>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
