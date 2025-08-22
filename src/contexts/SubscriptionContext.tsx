@@ -85,14 +85,45 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  const saveSubscription = (sub: Subscription | null) => {
+    try {
+      if (sub) {
+        localStorage.setItem('subscription', JSON.stringify(sub));
+      } else {
+        localStorage.removeItem('subscription');
+      }
+    } catch {}
+  };
+
+  const loadSubscription = (): Subscription | null => {
+    try {
+      const raw = localStorage.getItem('subscription');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      // sanity: garantir campos mínimos
+      if (parsed && parsed.plan_type && parsed.status && parsed.features) {
+        return parsed as Subscription;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const fetchSubscription = async () => {
     try {
       setLoading(true);
       
       // Simular delay de rede
       await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setSubscription(freeSubscription);
+
+      const stored = loadSubscription();
+      if (stored) {
+        setSubscription(stored);
+      } else {
+        setSubscription(freeSubscription);
+        saveSubscription(freeSubscription);
+      }
     } catch (error) {
       console.error('Erro ao buscar assinatura:', error);
     } finally {
@@ -148,6 +179,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       };
       
       setSubscription(newSubscription);
+      saveSubscription(newSubscription);
       
       toast({
         title: 'Trial iniciado!',
@@ -187,6 +219,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       };
       
       setSubscription(updatedSubscription);
+      saveSubscription(updatedSubscription);
       
       toast({
         title: 'Plano atualizado!',
@@ -227,6 +260,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         };
         
         setSubscription(updatedSubscription);
+        saveSubscription(updatedSubscription);
       }
       
       toast({
