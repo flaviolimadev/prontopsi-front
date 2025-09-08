@@ -37,7 +37,8 @@ import {
   Loader2,
   Sparkles,
   Mail,
-  MessageCircle
+  MessageCircle,
+  Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications, Notification } from '@/hooks/useNotifications';
@@ -292,6 +293,15 @@ export function Header() {
                 <Sparkles className="mr-2 h-4 w-4" />
                 <span>Agentes IA</span>
               </DropdownMenuItem>
+              {user?.isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/admin')}>
+                    <Shield className="mr-2 h-4 w-4" />
+                    <span>Administração</span>
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => {

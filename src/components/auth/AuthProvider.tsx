@@ -15,6 +15,7 @@ interface User {
   nome: string;
   sobrenome: string;
   emailVerified: boolean;
+  isAdmin?: boolean;
   [key: string]: any;
 }
 
@@ -84,7 +85,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log('🔧 AuthProvider: Dados do usuário:', {
           email: userData.email,
           emailVerified: userData.emailVerified,
-          status: userData.status
+          status: userData.status,
+          isAdmin: userData.isAdmin
         });
         
         // Se emailVerified for undefined, tratar como false

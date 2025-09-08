@@ -35,6 +35,7 @@ import Configuracoes from "./pages/Configuracoes";
 import Checkout from "./pages/Checkout";
 import PlanSelection from "./pages/PlanSelection";
 import Planos from "./pages/Planos";
+import AdminPage from "./pages/AdminPage";
 
 // Páginas de erro
 import NotFound from "./pages/NotFound";
@@ -219,6 +220,16 @@ function App() {
                       <ProtectedRoute>
                         <AppLayout>
                           <PlanSelection />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <AdminPage />
                         </AppLayout>
                       </ProtectedRoute>
                     }

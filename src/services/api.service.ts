@@ -49,6 +49,13 @@ class ApiService {
         console.log('🔍 Token será adicionado:', !isPublicRoute);
       }
       
+      // Log para debug de admin
+      if (config.url?.includes('/admin/')) {
+        console.log('🔍 Requisição para admin:', config.url);
+        console.log('🔍 Token disponível:', !!token);
+        console.log('🔍 Rota é pública:', isPublicRoute);
+      }
+      
       // Só adicionar token se não for rota pública
       if (token && !isPublicRoute) {
         config.headers.Authorization = `Bearer ${token}`;

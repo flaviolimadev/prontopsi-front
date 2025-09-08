@@ -26,6 +26,7 @@ export interface Profile {
     includeOverdue: boolean;
     customMessage: string;
   };
+  isAdmin?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -115,6 +116,7 @@ export function useProfile() {
           whatsapp_reports_enabled: profileData.whatsappReportsEnabled,
           whatsapp_report_time: profileData.whatsappReportTime,
           report_config: profileData.reportConfig,
+          isAdmin: profileData.isAdmin,
           created_at: profileData.createdAt,
           updated_at: profileData.updatedAt
         };
