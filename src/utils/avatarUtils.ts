@@ -30,10 +30,10 @@ export const getAvatarUrl = (avatarPath?: string): string => {
   }
   
   // Se é uma URL relativa, adiciona o backend URL
-  // Forçar URL do backend para teste
-  const backendUrl = 'http://localhost:3000';
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const backendUrl = apiUrl.replace('/api', ''); // Remove /api para pegar só o base URL
   const fullUrl = `${backendUrl}${avatarPath}`;
-  console.log('getAvatarUrl - Backend URL (forçado):', backendUrl);
+  console.log('getAvatarUrl - Backend URL:', backendUrl);
   console.log('getAvatarUrl - URL construída:', fullUrl);
   return fullUrl;
 }; 
