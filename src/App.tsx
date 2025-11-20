@@ -1,6 +1,6 @@
 
 import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import ExternalRedirect from "./components/ExternalRedirect";
+// import ExternalRedirect from "./components/ExternalRedirect";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { PublicRoute } from "./components/auth/PublicRoute";
@@ -51,7 +51,7 @@ function App() {
                 <AuthProvider>
                 <Routes>
                   {/* Páginas públicas */}
-                  <Route path="/" element={<ExternalRedirect to="https://site.prontupsi.com" />} />
+                  <Route path="/" element={<LandingPage />} />
                   <Route 
                     path="/login" 
                     element={
